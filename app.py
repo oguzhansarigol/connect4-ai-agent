@@ -11,7 +11,7 @@ app = Flask(__name__)
 app.secret_key = 'connect4-secret-key'  # Session için gerekli
 
 # AI derinliği
-AI_DEPTH = 5
+AI_DEPTH = 8
 
 def create_game_session(first_player=None):
     """Yeni bir oyun oturumu oluşturur"""
@@ -61,6 +61,7 @@ def make_move():
     """Oyuncu hamlesi yapar"""
     data = request.get_json()
     col = int(data['column'])
+    depth = int(data.get('depth', AI_DEPTH))  # Depth parametresini al
     
     if 'game' not in session:
         session['game'] = create_game_session()
@@ -104,9 +105,9 @@ def make_move():
         'valid_columns': get_valid_locations(game['board'])
     }
     
-    # Eğer AI'ın sırası geldiyse ve oyun bitmemişse AI hamlesini yap
+    # Eğer AI'ın sırası geldiyse ve oyun bitmeмиşse AI hamlesini yap
     if game['turn'] == PLAYER_AI and not game['game_over']:
-        ai_col = get_best_move(board, PLAYER_AI, AI_DEPTH)
+        ai_col = get_best_move(board, PLAYER_AI, depth)
         ai_row = get_next_open_row(board, ai_col)
         drop_piece(board, ai_row, ai_col, PLAYER_AI)
         game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}
@@ -142,6 +143,9 @@ def make_ai_move():
     if 'game' not in session:
         return jsonify({'error': 'Oyun oturumu bulunamadı'}), 400
     
+    data = request.get_json() or {}
+    depth = int(data.get('depth', AI_DEPTH))  # Depth parametresini al
+    
     game = session['game']
     board = game['board']
     
@@ -149,7 +153,7 @@ def make_ai_move():
         return jsonify({'error': 'AI hamle yapamaz'}), 400
     
     # AI hamlesini yap
-    ai_col = get_best_move(board, PLAYER_AI, AI_DEPTH)
+    ai_col = get_best_move(board, PLAYER_AI, depth)
     ai_row = get_next_open_row(board, ai_col)
     drop_piece(board, ai_row, ai_col, PLAYER_AI)
     game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}

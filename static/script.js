@@ -7,7 +7,8 @@ class Connect4Game {
         this.gameOver = false;
         this.winner = null;
         this.moveCount = 0;
-        this.aiThinkingTime = 0;
+        this.aiDepth = 8; // Default depth
+        this.devMode = false;
         
         this.initializeElements();
         this.bindEvents();
@@ -23,6 +24,10 @@ class Connect4Game {
         this.startAiBtn = document.getElementById('start-ai');
         this.startRandomBtn = document.getElementById('start-random');
         this.moveCountElement = document.getElementById('move-count');
+        this.devModeToggle = document.getElementById('dev-mode-toggle');
+        this.devSettings = document.getElementById('dev-settings');
+        this.depthSlider = document.getElementById('depth-slider');
+        this.depthValue = document.getElementById('depth-value');
         this.modal = document.getElementById('modal-overlay');
         this.modalTitle = document.getElementById('modal-title');
         this.modalMessage = document.getElementById('modal-message');
@@ -35,6 +40,8 @@ class Connect4Game {
         this.startHumanBtn.addEventListener('click', () => this.startNewGame('human'));
         this.startAiBtn.addEventListener('click', () => this.startNewGame('ai'));
         this.startRandomBtn.addEventListener('click', () => this.startNewGame('random'));
+        this.devModeToggle.addEventListener('change', (e) => this.toggleDevMode(e.target.checked));
+        this.depthSlider.addEventListener('input', (e) => this.updateDepth(e.target.value));
         this.modalNewGameBtn.addEventListener('click', () => this.newGameFromModal());
         this.modalCloseBtn.addEventListener('click', () => this.hideModal());
         this.modal.addEventListener('click', (e) => {
@@ -118,24 +125,38 @@ class Connect4Game {
     updateStatus() {
         if (this.gameOver) {
             if (this.winner === -1) {
-                this.statusElement.textContent = '🎉 Tebrikler! Kazandınız!';
+                this.statusElement.textContent = '🎉 Congratulations! You won!';
                 this.statusElement.style.color = '#27ae60';
             } else if (this.winner === 1) {
-                this.statusElement.textContent = '🤖 AI Kazandı!';
+                this.statusElement.textContent = '🤖 AI Won!';
                 this.statusElement.style.color = '#e74c3c';
             } else {
-                this.statusElement.textContent = '🤝 Berabere!';
+                this.statusElement.textContent = '🤝 Draw!';
                 this.statusElement.style.color = '#f39c12';
             }
         } else {
             if (this.turn === -1) {
-                this.statusElement.textContent = '🔴 Sizin sıranız';
+                this.statusElement.textContent = '🔴 Your turn';
                 this.statusElement.style.color = '#e74c3c';
             } else {
-                this.statusElement.innerHTML = '🟡 AI düşünüyor... <span class="loading"></span>';
+                this.statusElement.innerHTML = '🟡 AI is thinking... <span class="loading"></span>';
                 this.statusElement.style.color = '#f39c12';
             }
         }
+    }
+    
+    toggleDevMode(enabled) {
+        this.devMode = enabled;
+        if (enabled) {
+            this.devSettings.classList.add('active');
+        } else {
+            this.devSettings.classList.remove('active');
+        }
+    }
+    
+    updateDepth(value) {
+        this.aiDepth = parseInt(value);
+        this.depthValue.textContent = value;
     }
     
     updateMoveCount() {
@@ -154,7 +175,10 @@ class Connect4Game {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ column: col })
+                body: JSON.stringify({ 
+                    column: col,
+                    depth: this.aiDepth 
+                })
             });
             
             const data = await response.json();
@@ -210,7 +234,13 @@ class Connect4Game {
         this.updateStatus();
         
         try {
-            const response = await fetch('/api/ai-move', { method: 'POST' });
+            const response = await fetch('/api/ai-move', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ depth: this.aiDepth })
+            });
             const data = await response.json();
             
             if (!response.ok) {
@@ -228,14 +258,14 @@ class Connect4Game {
     
     showGameOverModal() {
         if (this.winner === -1) {
-            this.modalTitle.textContent = '🎉 Tebrikler!';
-            this.modalMessage.textContent = 'Harika oynadınız ve AI\'ı yendiniz!';
+            this.modalTitle.textContent = '🎉 Congratulations!';
+            this.modalMessage.textContent = 'Great game! You beat the AI!';
         } else if (this.winner === 1) {
-            this.modalTitle.textContent = '🤖 AI Kazandı';
-            this.modalMessage.textContent = 'Bu sefer AI daha iyiydi. Tekrar deneyin!';
+            this.modalTitle.textContent = '🤖 AI Won';
+            this.modalMessage.textContent = 'AI was better this time. Try again!';
         } else {
-            this.modalTitle.textContent = '🤝 Berabere';
-            this.modalMessage.textContent = 'İyi mücadele! İkiniz de harika oynadınız.';
+            this.modalTitle.textContent = '🤝 Draw';
+            this.modalMessage.textContent = 'Good fight! You both played great.';
         }
         
         this.modal.classList.add('show');

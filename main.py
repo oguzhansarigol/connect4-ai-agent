@@ -12,7 +12,7 @@ import sys
 
 # Yapay zekanın ne kadar ileriyi düşüneceğini belirleyen derinlik.
 # Değeri artırmak AI'ı daha zeki ama daha yavaş yapar. 4-5 iyi bir başlangıçtır.
-AI_DEPTH = 5
+AI_DEPTH = 8
 
 def main():
     """

@@ -10,19 +10,37 @@
     <div class="container">
         <header>
             <h1>🔴 Connect4 AI Agent 🟡</h1>
-            <p class="subtitle">Yapay Zekâya Karşı Oyna!</p>
+            <p class="subtitle">Play Against AI!</p>
         </header>
         
+        <!-- Developer Mode Toggle -->
+        <div class="developer-mode">
+            <label class="switch">
+                <input type="checkbox" id="dev-mode-toggle">
+                <span class="slider"></span>
+            </label>
+            <span class="dev-label">Developer Mode</span>
+        </div>
+        
+        <!-- Developer Settings (hidden by default) -->
+        <div class="dev-settings" id="dev-settings">
+            <div class="depth-control">
+                <label for="depth-slider">AI Depth: <span id="depth-value">8</span></label>
+                <input type="range" id="depth-slider" min="1" max="12" value="8" class="depth-slider">
+                <p class="depth-info">Higher depth = Stronger AI (slower)</p>
+            </div>
+        </div>
+        
         <div class="game-info">
-            <div class="status" id="game-status">Oyun yükleniyor...</div>
+            <div class="status" id="game-status">Loading game...</div>
             <div class="players">
                 <div class="player human">
                     <span class="piece red"></span>
-                    <span>Sen (Kırmızı)</span>
+                    <span>You (Red)</span>
                 </div>
                 <div class="player ai">
                     <span class="piece yellow"></span>
-                    <span>AI (Sarı)</span>
+                    <span>AI (Yellow)</span>
                 </div>
             </div>
         </div>
@@ -41,19 +59,19 @@
         
         <div class="game-controls">
             <div class="first-player-selection">
-                <label>Kim başlasın?</label>
+                <label>Who starts?</label>
                 <div class="player-options">
-                    <button id="start-human" class="btn player-btn human-btn">🔴 Ben başlayayım</button>
-                    <button id="start-ai" class="btn player-btn ai-btn">🟡 AI başlasın</button>
-                    <button id="start-random" class="btn player-btn random-btn">🎲 Rastgele</button>
+                    <button id="start-human" class="btn player-btn human-btn">🔴 I start</button>
+                    <button id="start-ai" class="btn player-btn ai-btn">🟡 AI starts</button>
+                    <button id="start-random" class="btn player-btn random-btn">🎲 Random</button>
                 </div>
             </div>
-            <button id="reset-btn" class="btn reset-btn">🔄 Yeni Oyun</button>
+            <button id="reset-btn" class="btn reset-btn">🔄 New Game</button>
         </div>
         
         <div class="game-stats">
             <div class="stat">
-                <span class="stat-label">Toplam Hamle:</span>
+                <span class="stat-label">Total Moves:</span>
                 <span class="stat-value" id="move-count">0</span>
             </div>
         </div>
@@ -62,11 +80,11 @@
         <div class="modal-overlay" id="modal-overlay">
             <div class="modal">
                 <div class="modal-content">
-                    <h2 id="modal-title">Oyun Bitti!</h2>
-                    <p id="modal-message">Tebrikler!</p>
+                    <h2 id="modal-title">Game Over!</h2>
+                    <p id="modal-message">Congratulations!</p>
                     <div class="modal-buttons">
-                        <button id="modal-new-game" class="btn primary-btn">Yeni Oyun</button>
-                        <button id="modal-close" class="btn secondary-btn">Kapat</button>
+                        <button id="modal-new-game" class="btn primary-btn">New Game</button>
+                        <button id="modal-close" class="btn secondary-btn">Close</button>
                     </div>
                 </div>
             </div>
