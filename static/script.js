@@ -182,6 +182,7 @@ class Connect4Game {
         this.updateStatus();
         
         try {
+            // 1. Önce kullanıcı hamlesini yap
             const response = await fetch('/api/move', {
                 method: 'POST',
                 headers: {
@@ -202,13 +203,14 @@ class Connect4Game {
             
             this.moveCount++;
             
-            // İnsan hamlesi sonrası AI hamle yaptıysa, onun skorlarını göster
-            if (this.devMode && data.ai_move && data.ai_move.column_scores) {
-                const aiThinkingTime = data.ai_move.thinking_time || null;
-                this.showColumnScores(data.ai_move.column_scores, data.ai_move.col, aiThinkingTime);
-            }
-            
+            // 2. Kullanıcı hamlesini HEMEN ekrana yansıt
             this.updateGameState(data);
+            
+            // 3. Eğer AI'ın sırası geldiyse, kısa bir gecikme sonrası AI hamlesini tetikle
+            if (data.turn === 1 && !data.game_over) {
+                // Kullanıcı hamlesinin görünmesi için 300ms bekle
+                setTimeout(() => this.makeAIMove(), 300);
+            }
             
         } catch (error) {
             console.error('Hamle yapılırken hata:', error);

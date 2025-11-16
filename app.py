@@ -96,6 +96,7 @@ def make_move():
     session['game'] = game
     session.modified = True
     
+    # SADECE kullanıcı hamlesini döndür - AI hamlesi ayrı endpoint'ten gelecek
     response_data = {
         'board': board_to_json(game['board']),
         'turn': game['turn'],
@@ -104,54 +105,6 @@ def make_move():
         'last_move': game['last_move'],
         'valid_columns': get_valid_locations(game['board'])
     }
-    
-    # Eğer AI'ın sırası geldiyse ve oyun bitmemişse AI hamlesini yap
-    if game['turn'] == PLAYER_AI and not game['game_over']:
-        import time
-        developer_mode = data.get('developer_mode', False)
-        column_scores = None
-        
-        start_time = time.time()
-        if developer_mode:
-            ai_col, column_scores = get_best_move(board, PLAYER_AI, depth, developer_mode=True)
-        else:
-            ai_col = get_best_move(board, PLAYER_AI, depth, developer_mode=False)
-        thinking_time = time.time() - start_time
-        
-        ai_row = get_next_open_row(board, ai_col)
-        drop_piece(board, ai_row, ai_col, PLAYER_AI)
-        game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}
-        
-        # AI kazanma kontrolü
-        if winning_move(board, PLAYER_AI):
-            game['game_over'] = True
-            game['winner'] = PLAYER_AI
-        elif len(get_valid_locations(board)) == 0:
-            game['game_over'] = True
-            game['winner'] = None  # Beraberlik
-        else:
-            game['turn'] = PLAYER_HUMAN
-        
-        session['game'] = game
-        session.modified = True
-        
-        response_data = {
-            'board': board_to_json(game['board']),
-            'turn': game['turn'],
-            'game_over': game['game_over'],
-            'winner': game['winner'],
-            'last_move': game['last_move'],
-            'valid_columns': get_valid_locations(game['board']),
-            'ai_move': {
-                'row': ai_row, 
-                'col': ai_col,
-                'thinking_time': round(thinking_time, 3)
-            }
-        }
-        
-        # Developer mode ise sütun skorlarını da ekle
-        if developer_mode and column_scores:
-            response_data['ai_move']['column_scores'] = {str(k): float(v) if v is not None else None for k, v in column_scores.items()}
     
     return jsonify(response_data)
 
