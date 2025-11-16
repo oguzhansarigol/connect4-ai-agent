@@ -13,10 +13,13 @@ app.secret_key = 'connect4-secret-key'  # Session için gerekli
 # AI derinliği
 AI_DEPTH = 5
 
-def create_game_session():
+def create_game_session(first_player=None):
     """Yeni bir oyun oturumu oluşturur"""
     board = create_board()
-    turn = random.choice([PLAYER_HUMAN, PLAYER_AI])
+    if first_player is None:
+        turn = random.choice([PLAYER_HUMAN, PLAYER_AI])
+    else:
+        turn = first_player
     return {
         'board': board,
         'turn': turn,
@@ -34,6 +37,7 @@ def index():
     """Ana sayfa - oyun arayüzü"""
     if 'game' not in session:
         session['game'] = create_game_session()
+        session.modified = True
     return render_template('index.html')
 
 @app.route('/api/game', methods=['GET'])
@@ -132,10 +136,60 @@ def make_move():
     
     return jsonify(response_data)
 
+@app.route('/api/ai-move', methods=['POST'])
+def make_ai_move():
+    """AI hamlesini yapar"""
+    if 'game' not in session:
+        return jsonify({'error': 'Oyun oturumu bulunamadı'}), 400
+    
+    game = session['game']
+    board = game['board']
+    
+    if game['game_over'] or game['turn'] != PLAYER_AI:
+        return jsonify({'error': 'AI hamle yapamaz'}), 400
+    
+    # AI hamlesini yap
+    ai_col = get_best_move(board, PLAYER_AI, AI_DEPTH)
+    ai_row = get_next_open_row(board, ai_col)
+    drop_piece(board, ai_row, ai_col, PLAYER_AI)
+    game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}
+    
+    # Kazanma kontrolü
+    if winning_move(board, PLAYER_AI):
+        game['game_over'] = True
+        game['winner'] = PLAYER_AI
+    elif len(get_valid_locations(board)) == 0:
+        game['game_over'] = True
+        game['winner'] = None
+    else:
+        game['turn'] = PLAYER_HUMAN
+    
+    session['game'] = game
+    session.modified = True
+    
+    return jsonify({
+        'board': board_to_json(game['board']),
+        'turn': game['turn'],
+        'game_over': game['game_over'],
+        'winner': game['winner'],
+        'last_move': game['last_move'],
+        'valid_columns': get_valid_locations(game['board']),
+        'ai_move': {'row': ai_row, 'col': ai_col}
+    })
+
 @app.route('/api/reset', methods=['POST'])
 def reset_game():
     """Oyunu yeniden başlatır"""
-    session['game'] = create_game_session()
+    data = request.get_json() or {}
+    first_player = data.get('first_player')
+    if first_player == 'human':
+        first_player = PLAYER_HUMAN
+    elif first_player == 'ai':
+        first_player = PLAYER_AI
+    else:
+        first_player = None
+    
+    session['game'] = create_game_session(first_player)
     session.modified = True
     
     game = session['game']

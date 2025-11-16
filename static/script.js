@@ -19,6 +19,9 @@ class Connect4Game {
         this.boardElement = document.getElementById('board');
         this.columnButtonsElement = document.getElementById('column-buttons');
         this.resetBtn = document.getElementById('reset-btn');
+        this.startHumanBtn = document.getElementById('start-human');
+        this.startAiBtn = document.getElementById('start-ai');
+        this.startRandomBtn = document.getElementById('start-random');
         this.moveCountElement = document.getElementById('move-count');
         this.modal = document.getElementById('modal-overlay');
         this.modalTitle = document.getElementById('modal-title');
@@ -29,6 +32,9 @@ class Connect4Game {
     
     bindEvents() {
         this.resetBtn.addEventListener('click', () => this.resetGame());
+        this.startHumanBtn.addEventListener('click', () => this.startNewGame('human'));
+        this.startAiBtn.addEventListener('click', () => this.startNewGame('ai'));
+        this.startRandomBtn.addEventListener('click', () => this.startNewGame('random'));
         this.modalNewGameBtn.addEventListener('click', () => this.newGameFromModal());
         this.modalCloseBtn.addEventListener('click', () => this.hideModal());
         this.modal.addEventListener('click', (e) => {
@@ -60,6 +66,9 @@ class Connect4Game {
         
         if (this.gameOver) {
             this.showGameOverModal();
+        } else if (this.turn === 1) {
+            // AI'ın sırası geldiyse otomatik hamle yap
+            setTimeout(() => this.makeAIMove(), 500);
         }
     }
     
@@ -169,8 +178,19 @@ class Connect4Game {
     }
     
     async resetGame() {
+        // Rastgele bir başlangıç oyuncusu seç
+        await this.startNewGame('random');
+    }
+    
+    async startNewGame(firstPlayer) {
         try {
-            const response = await fetch('/api/reset', { method: 'POST' });
+            const response = await fetch('/api/reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ first_player: firstPlayer })
+            });
             const data = await response.json();
             
             this.moveCount = 0;
@@ -178,8 +198,31 @@ class Connect4Game {
             this.hideModal();
             
         } catch (error) {
-            console.error('Oyun sıfırlanırken hata:', error);
-            alert('Oyun sıfırlanırken hata oluştu!');
+            console.error('Yeni oyun başlatılırken hata:', error);
+            alert('Yeni oyun başlatılırken hata oluştu!');
+        }
+    }
+    
+    async makeAIMove() {
+        if (this.gameOver || this.turn !== 1) return;
+        
+        this.disableColumnButtons();
+        this.updateStatus();
+        
+        try {
+            const response = await fetch('/api/ai-move', { method: 'POST' });
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'AI hamle yapılırken hata oluştu');
+            }
+            
+            this.moveCount++;
+            this.updateGameState(data);
+            
+        } catch (error) {
+            console.error('AI hamle yapılırken hata:', error);
+            alert('AI hamle yapılırken hata oluştu: ' + error.message);
         }
     }
     
