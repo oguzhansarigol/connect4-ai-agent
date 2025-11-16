@@ -99,6 +99,18 @@ class Connect4Game {
                     cell.classList.add('empty');
                 }
                 
+                // Hücreye tıklama event'i ekle
+                cell.addEventListener('click', () => {
+                    if (!this.gameOver && this.turn === -1) {
+                        this.makeMove(col);
+                    }
+                });
+                
+                // Hover efekti için cursor ekle
+                if (!this.gameOver && this.turn === -1) {
+                    cell.style.cursor = 'pointer';
+                }
+                
                 this.boardElement.appendChild(cell);
             }
         }
@@ -350,7 +362,7 @@ class Connect4Game {
                 
                 html += `
                     <div class="score-row ${isBest ? 'best-score' : ''}">
-                        <div class="score-label">Column ${col}:</div>
+                        <div class="score-label">Column ${col + 1}:</div>
                         <div class="score-bar-container">
                             <div class="score-bar" style="width: ${barWidth}%; background: ${barColor}"></div>
                         </div>
@@ -361,7 +373,7 @@ class Connect4Game {
             } else {
                 html += `
                     <div class="score-row disabled">
-                        <div class="score-label">Column ${col}:</div>
+                        <div class="score-label">Column ${col + 1}:</div>
                         <div class="score-bar-container">
                             <div class="score-bar" style="width: 0%; background: #bdc3c7"></div>
                         </div>
