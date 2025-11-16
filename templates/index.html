@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect4 AI Agent</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔴 Connect4 AI Agent 🟡</h1>
+            <p class="subtitle">Yapay Zekâya Karşı Oyna!</p>
+        </header>
+        
+        <div class="game-info">
+            <div class="status" id="game-status">Oyun yükleniyor...</div>
+            <div class="players">
+                <div class="player human">
+                    <span class="piece red"></span>
+                    <span>Sen (Kırmızı)</span>
+                </div>
+                <div class="player ai">
+                    <span class="piece yellow"></span>
+                    <span>AI (Sarı)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-board" id="game-board">
+            <!-- Sütun butonları -->
+            <div class="column-buttons" id="column-buttons">
+                <!-- JavaScript ile oluşturulacak -->
+            </div>
+            
+            <!-- Oyun tahtası -->
+            <div class="board" id="board">
+                <!-- JavaScript ile oluşturulacak -->
+            </div>
+        </div>
+        
+        <div class="game-controls">
+            <button id="reset-btn" class="btn reset-btn">🔄 Yeni Oyun</button>
+            <button id="hint-btn" class="btn hint-btn" disabled>💡 İpucu</button>
+        </div>
+        
+        <div class="game-stats">
+            <div class="stat">
+                <span class="stat-label">Toplam Hamle:</span>
+                <span class="stat-value" id="move-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">AI Düşünme Süresi:</span>
+                <span class="stat-value" id="ai-time">-</span>
+            </div>
+        </div>
+        
+        <!-- Modal için overlay -->
+        <div class="modal-overlay" id="modal-overlay">
+            <div class="modal">
+                <div class="modal-content">
+                    <h2 id="modal-title">Oyun Bitti!</h2>
+                    <p id="modal-message">Tebrikler!</p>
+                    <div class="modal-buttons">
+                        <button id="modal-new-game" class="btn primary-btn">Yeni Oyun</button>
+                        <button id="modal-close" class="btn secondary-btn">Kapat</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
