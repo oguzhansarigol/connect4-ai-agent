@@ -9,10 +9,14 @@ from connect4.agent import get_best_move
 # Standart kütüphaneler
 import random
 import sys
+import time
 
 # Yapay zekanın ne kadar ileriyi düşüneceğini belirleyen derinlik.
 # Değeri artırmak AI'ı daha zeki ama daha yavaş yapar. 4-5 iyi bir başlangıçtır.
 AI_DEPTH = 8
+
+# DEVELOPER MODE - AI'nin düşünme sürecini göster
+DEVELOPER_MODE = False  # True yaparak aktifleştirin!
 
 def main():
     """
@@ -23,6 +27,11 @@ def main():
     
     print("--- Connect4 AI Agent ---")
     print("Siz 'O' harfisiniz, Yapay Zekâ 'X' harfi.")
+    
+    if DEVELOPER_MODE:
+        print("\n🛠️  DEVELOPER MODE AKTİF!")
+        print("   AI'nin tüm sütün skorlarını göreceksiniz.")
+        print("   Devre dışı bırakmak için: DEVELOPER_MODE = False\n")
     
     # Oyuna kimin başlayacağını rastgele seçelim
     turn = random.choice([PLAYER_HUMAN, PLAYER_AI])
@@ -60,10 +69,17 @@ def main():
                 print("Hatalı giriş. Lütfen 0 ile 6 arasında bir sayı girin.")
                 continue
         
-        # --- Yapay Zekânın Sırası ---
+        # --- Yapay Zekanın Sırası ---
         if turn == PLAYER_AI and not game_over:
             # AI'dan en iyi hamleyi al
-            col = get_best_move(board, PLAYER_AI, AI_DEPTH)
+            if DEVELOPER_MODE:
+                col, column_scores = get_best_move(board, PLAYER_AI, AI_DEPTH, developer_mode=True)
+                
+                # Görsel efekt: Yavaşça hamleyi göster
+                print("\n   ⏳ Hamle yapılıyor...")
+                time.sleep(1.5)  # 1.5 saniye bekleme - sunumda etkileyici!
+            else:
+                col = get_best_move(board, PLAYER_AI, AI_DEPTH)
 
             # AI'ın hamlesini uygula
             if is_valid_location(board, col):

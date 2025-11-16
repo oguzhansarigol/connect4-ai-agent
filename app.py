@@ -105,9 +105,19 @@ def make_move():
         'valid_columns': get_valid_locations(game['board'])
     }
     
-    # Eğer AI'ın sırası geldiyse ve oyun bitmeмиşse AI hamlesini yap
+    # Eğer AI'ın sırası geldiyse ve oyun bitmemişse AI hamlesini yap
     if game['turn'] == PLAYER_AI and not game['game_over']:
-        ai_col = get_best_move(board, PLAYER_AI, depth)
+        import time
+        developer_mode = data.get('developer_mode', False)
+        column_scores = None
+        
+        start_time = time.time()
+        if developer_mode:
+            ai_col, column_scores = get_best_move(board, PLAYER_AI, depth, developer_mode=True)
+        else:
+            ai_col = get_best_move(board, PLAYER_AI, depth, developer_mode=False)
+        thinking_time = time.time() - start_time
+        
         ai_row = get_next_open_row(board, ai_col)
         drop_piece(board, ai_row, ai_col, PLAYER_AI)
         game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}
@@ -132,19 +142,30 @@ def make_move():
             'winner': game['winner'],
             'last_move': game['last_move'],
             'valid_columns': get_valid_locations(game['board']),
-            'ai_move': {'row': ai_row, 'col': ai_col}
+            'ai_move': {
+                'row': ai_row, 
+                'col': ai_col,
+                'thinking_time': round(thinking_time, 3)
+            }
         }
+        
+        # Developer mode ise sütun skorlarını da ekle
+        if developer_mode and column_scores:
+            response_data['ai_move']['column_scores'] = {str(k): float(v) if v is not None else None for k, v in column_scores.items()}
     
     return jsonify(response_data)
 
 @app.route('/api/ai-move', methods=['POST'])
 def make_ai_move():
     """AI hamlesini yapar"""
+    import time
+    
     if 'game' not in session:
         return jsonify({'error': 'Oyun oturumu bulunamadı'}), 400
     
     data = request.get_json() or {}
     depth = int(data.get('depth', AI_DEPTH))  # Depth parametresini al
+    developer_mode = data.get('developer_mode', False)  # Developer mode kontrolü
     
     game = session['game']
     board = game['board']
@@ -152,8 +173,15 @@ def make_ai_move():
     if game['game_over'] or game['turn'] != PLAYER_AI:
         return jsonify({'error': 'AI hamle yapamaz'}), 400
     
-    # AI hamlesini yap
-    ai_col = get_best_move(board, PLAYER_AI, depth)
+    # AI hamlesini yap (developer mode ile veya olmadan)
+    column_scores = None
+    start_time = time.time()
+    if developer_mode:
+        ai_col, column_scores = get_best_move(board, PLAYER_AI, depth, developer_mode=True)
+    else:
+        ai_col = get_best_move(board, PLAYER_AI, depth, developer_mode=False)
+    thinking_time = time.time() - start_time
+    
     ai_row = get_next_open_row(board, ai_col)
     drop_piece(board, ai_row, ai_col, PLAYER_AI)
     game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}
@@ -171,15 +199,25 @@ def make_ai_move():
     session['game'] = game
     session.modified = True
     
-    return jsonify({
+    response = {
         'board': board_to_json(game['board']),
         'turn': game['turn'],
         'game_over': game['game_over'],
         'winner': game['winner'],
         'last_move': game['last_move'],
         'valid_columns': get_valid_locations(game['board']),
-        'ai_move': {'row': ai_row, 'col': ai_col}
-    })
+        'ai_move': {
+            'row': ai_row, 
+            'col': ai_col,
+            'thinking_time': round(thinking_time, 3)
+        }
+    }
+    
+    # Developer mode ise sütun skorlarını da ekle
+    if developer_mode and column_scores:
+        response['ai_move']['column_scores'] = {str(k): float(v) if v is not None else None for k, v in column_scores.items()}
+    
+    return jsonify(response)
 
 @app.route('/api/reset', methods=['POST'])
 def reset_game():

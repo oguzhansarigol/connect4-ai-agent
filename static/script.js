@@ -177,7 +177,8 @@ class Connect4Game {
                 },
                 body: JSON.stringify({ 
                     column: col,
-                    depth: this.aiDepth 
+                    depth: this.aiDepth,
+                    developer_mode: this.devMode
                 })
             });
             
@@ -188,6 +189,13 @@ class Connect4Game {
             }
             
             this.moveCount++;
+            
+            // İnsan hamlesi sonrası AI hamle yaptıysa, onun skorlarını göster
+            if (this.devMode && data.ai_move && data.ai_move.column_scores) {
+                const aiThinkingTime = data.ai_move.thinking_time || null;
+                this.showColumnScores(data.ai_move.column_scores, data.ai_move.col, aiThinkingTime);
+            }
+            
             this.updateGameState(data);
             
         } catch (error) {
@@ -234,20 +242,37 @@ class Connect4Game {
         this.updateStatus();
         
         try {
+            const startTime = performance.now();
+            
             const response = await fetch('/api/ai-move', { 
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ depth: this.aiDepth })
+                body: JSON.stringify({ 
+                    depth: this.aiDepth,
+                    developer_mode: this.devMode
+                })
             });
             const data = await response.json();
+            
+            const thinkingTime = ((performance.now() - startTime) / 1000).toFixed(3);
             
             if (!response.ok) {
                 throw new Error(data.error || 'AI hamle yapılırken hata oluştu');
             }
             
             this.moveCount++;
+            
+            // Developer mode ise skorları göster
+            if (this.devMode && data.ai_move) {
+                const aiScores = data.ai_move.column_scores || null;
+                const aiTime = data.ai_move.thinking_time || null;
+                if (aiScores) {
+                    this.showColumnScores(aiScores, data.ai_move.col, aiTime);
+                }
+            }
+            
             this.updateGameState(data);
             
         } catch (error) {
@@ -277,6 +302,85 @@ class Connect4Game {
     
     newGameFromModal() {
         this.resetGame();
+    }
+    
+    showColumnScores(columnScores, bestCol, thinkingTime = null) {
+        // Skor panelini oluştur veya güncelle
+        let scorePanel = document.getElementById('score-panel');
+        if (!scorePanel) {
+            scorePanel = document.createElement('div');
+            scorePanel.id = 'score-panel';
+            scorePanel.className = 'score-panel';
+            document.querySelector('.container').appendChild(scorePanel);
+        }
+        
+        // En yüksek ve en düşük skorları bul (normalizasyon için)
+        const scores = Object.values(columnScores).map(v => parseFloat(v));
+        const maxScore = Math.max(...scores);
+        const minScore = Math.min(...scores);
+        const scoreRange = maxScore - minScore || 1;
+        
+        let html = '<div class="score-header">🔍 AI Decision Process</div>';
+        html += '<div class="score-subtitle">Column Evaluations (Minimax Scores)</div>';
+        
+        // AI düşünme süresini göster
+        if (thinkingTime !== null) {
+            html += `<div class="thinking-time">⏱️ Thinking Time: ${thinkingTime}s</div>`;
+        }
+        
+        html += '<div class="scores-container">';
+        
+        for (let col = 0; col < 7; col++) {
+            const score = columnScores[col];
+            const isBest = col == bestCol;
+            const isValid = score !== undefined && score !== null;
+            
+            if (isValid) {
+                // Normalize score for bar visualization (0-100)
+                const normalizedScore = ((parseFloat(score) - minScore) / scoreRange) * 100;
+                const barWidth = Math.max(5, normalizedScore);
+                
+                // Color based on score
+                let barColor = '#3498db'; // Default blue
+                if (parseFloat(score) > 50) barColor = '#2ecc71'; // High score = green
+                else if (parseFloat(score) < -50) barColor = '#e74c3c'; // Low score = red
+                else if (parseFloat(score) > 0) barColor = '#95a5a6'; // Positive = gray
+                
+                if (isBest) barColor = '#f39c12'; // Best = orange
+                
+                html += `
+                    <div class="score-row ${isBest ? 'best-score' : ''}">
+                        <div class="score-label">Column ${col}:</div>
+                        <div class="score-bar-container">
+                            <div class="score-bar" style="width: ${barWidth}%; background: ${barColor}"></div>
+                        </div>
+                        <div class="score-value">${parseFloat(score).toFixed(2)}</div>
+                        ${isBest ? '<div class="best-badge">⭐ BEST</div>' : ''}
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="score-row disabled">
+                        <div class="score-label">Column ${col}:</div>
+                        <div class="score-bar-container">
+                            <div class="score-bar" style="width: 0%; background: #bdc3c7"></div>
+                        </div>
+                        <div class="score-value">FULL</div>
+                    </div>
+                `;
+            }
+        }
+        
+        html += '</div>';
+        html += '<div class="score-legend">';
+        html += '<span>💡 Higher = Better for AI</span> | ';
+        html += '<span>🎯 Negative = Risky</span>';
+        html += '</div>';
+        
+        scorePanel.innerHTML = html;
+        scorePanel.classList.add('show');
+        
+        // Panel açık kalsın, kapanmasın
     }
 }
 
