@@ -26,6 +26,7 @@ class Connect4Game {
         this.moveCountElement = document.getElementById('move-count');
         this.devModeToggle = document.getElementById('dev-mode-toggle');
         this.devSettings = document.getElementById('dev-settings');
+        this.depthSection = document.getElementById('depth-section');
         this.depthSlider = document.getElementById('depth-slider');
         this.depthValue = document.getElementById('depth-value');
         this.modal = document.getElementById('modal-overlay');
@@ -159,10 +160,24 @@ class Connect4Game {
     
     toggleDevMode(enabled) {
         this.devMode = enabled;
-        if (enabled) {
-            this.devSettings.classList.add('active');
-        } else {
-            this.devSettings.classList.remove('active');
+        
+        // Depth section görünürlüğünü kontrol et
+        if (this.depthSection) {
+            if (enabled) {
+                this.depthSection.classList.add('active');
+            } else {
+                this.depthSection.classList.remove('active');
+            }
+        }
+        
+        // AI Decision Panel görünürlüğünü kontrol et
+        const aiDecisionPanel = document.getElementById('ai-decision-panel');
+        if (aiDecisionPanel) {
+            if (!enabled) {
+                // Developer mode kapandıysa paneli gizle
+                aiDecisionPanel.classList.remove('visible');
+                aiDecisionPanel.innerHTML = '';
+            }
         }
     }
     
@@ -319,13 +334,15 @@ class Connect4Game {
     }
     
     showColumnScores(columnScores, bestCol, thinkingTime = null) {
+        // Sadece Developer Mode aktifse göster
+        if (!this.devMode) {
+            return;
+        }
+        
         // Skor panelini oluştur veya güncelle
-        let scorePanel = document.getElementById('score-panel');
+        let scorePanel = document.getElementById('ai-decision-panel');
         if (!scorePanel) {
-            scorePanel = document.createElement('div');
-            scorePanel.id = 'score-panel';
-            scorePanel.className = 'score-panel';
-            document.querySelector('.container').appendChild(scorePanel);
+            return;
         }
         
         // En yüksek ve en düşük skorları bul (normalizasyon için)
@@ -392,7 +409,7 @@ class Connect4Game {
         html += '</div>';
         
         scorePanel.innerHTML = html;
-        scorePanel.classList.add('show');
+        scorePanel.classList.add('visible');
         
         // Panel açık kalsın, kapanmasın
     }

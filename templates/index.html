@@ -13,66 +13,96 @@
             <p class="subtitle">Play Against AI!</p>
         </header>
         
-        <!-- Developer Mode Toggle -->
-        <div class="developer-mode">
-            <label class="switch">
-                <input type="checkbox" id="dev-mode-toggle">
-                <span class="slider"></span>
-            </label>
-            <span class="dev-label">Developer Mode</span>
-        </div>
-        
-        <!-- Developer Settings (hidden by default) -->
-        <div class="dev-settings" id="dev-settings">
-            <div class="depth-control">
-                <label for="depth-slider">AI Depth: <span id="depth-value">8</span></label>
-                <input type="range" id="depth-slider" min="1" max="12" value="8" class="depth-slider">
-                <p class="depth-info">Higher depth = Stronger AI (slower)</p>
-            </div>
-        </div>
-        
-        <div class="game-info">
-            <div class="status" id="game-status">Loading game...</div>
-            <div class="players">
-                <div class="player human">
-                    <span class="piece red"></span>
-                    <span>You (Red)</span>
+        <!-- Main Layout: Sol Kontrol Paneli + Sağ Oyun Alanı -->
+        <div class="main-layout">
+            <!-- Sol Kontrol Paneli -->
+            <div class="control-panel">
+                <h3 class="panel-title">⚙️ Control Panel</h3>
+                
+                <!-- Developer Mode Toggle -->
+                <div class="control-section">
+                    <div class="developer-mode">
+                        <label class="switch">
+                            <input type="checkbox" id="dev-mode-toggle">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="dev-label">Developer Mode</span>
+                    </div>
                 </div>
-                <div class="player ai">
-                    <span class="piece yellow"></span>
-                    <span>AI (Yellow)</span>
+                
+                <!-- Depth Control (sadece dev mode'da görünür) -->
+                <div class="control-section depth-section" id="depth-section">
+                    <h4 class="section-title">AI Search Depth</h4>
+                    <div class="depth-control">
+                        <div class="depth-header">
+                            <span class="depth-label">Depth:</span>
+                            <span class="depth-value" id="depth-value">8</span>
+                        </div>
+                        <input type="range" id="depth-slider" min="1" max="12" value="8" class="depth-slider">
+                        <p class="depth-info">Higher = Stronger (slower)</p>
+                    </div>
                 </div>
-            </div>
-        </div>
-        
-        <div class="game-board" id="game-board">
-            <!-- Sütun butonları -->
-            <div class="column-buttons" id="column-buttons">
-                <!-- JavaScript ile oluşturulacak -->
+                
+                <!-- Game Start Options -->
+                <div class="control-section">
+                    <h4 class="section-title">Start New Game</h4>
+                    <div class="start-buttons">
+                        <button id="start-human" class="btn control-btn human-btn">🔴 I Start</button>
+                        <button id="start-ai" class="btn control-btn ai-btn">🟡 AI Starts</button>
+                        <button id="start-random" class="btn control-btn random-btn">🎲 Random</button>
+                    </div>
+                </div>
+                
+                <!-- Reset Button -->
+                <div class="control-section">
+                    <button id="reset-btn" class="btn control-btn reset-btn">🔄 New Game</button>
+                </div>
+                
+                <!-- Stats -->
+                <div class="control-section stats-section">
+                    <h4 class="section-title">Statistics</h4>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Moves:</span>
+                        <span class="stat-value" id="move-count">0</span>
+                    </div>
+                </div>
             </div>
             
-            <!-- Oyun tahtası -->
-            <div class="board" id="board">
-                <!-- JavaScript ile oluşturulacak -->
-            </div>
-        </div>
-        
-        <div class="game-controls">
-            <div class="first-player-selection">
-                <label>Who starts?</label>
-                <div class="player-options">
-                    <button id="start-human" class="btn player-btn human-btn">🔴 I start</button>
-                    <button id="start-ai" class="btn player-btn ai-btn">🟡 AI starts</button>
-                    <button id="start-random" class="btn player-btn random-btn">🎲 Random</button>
+            <!-- Sağ Oyun Alanı -->
+            <div class="game-area"> -->
+            <div class="game-area">
+                <div class="game-info">
+                    <div class="status" id="game-status">Loading game...</div>
+                    <div class="players">
+                        <div class="player human">
+                            <span class="piece red"></span>
+                            <span>You (Red)</span>
+                        </div>
+                        <div class="player ai">
+                            <span class="piece yellow"></span>
+                            <span>AI (Yellow)</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <button id="reset-btn" class="btn reset-btn">🔄 New Game</button>
-        </div>
-        
-        <div class="game-stats">
-            <div class="stat">
-                <span class="stat-label">Total Moves:</span>
-                <span class="stat-value" id="move-count">0</span>
+                
+                <div class="game-content">
+                    <div class="game-board" id="game-board">
+                        <!-- Sütun butonları -->
+                        <div class="column-buttons" id="column-buttons">
+                            <!-- JavaScript ile oluşturulacak -->
+                        </div>
+                        
+                        <!-- Oyun tahtası -->
+                        <div class="board" id="board">
+                            <!-- JavaScript ile oluşturulacak -->
+                        </div>
+                    </div>
+                    
+                    <!-- AI Decision Process (sadece Developer Mode'da görünür) -->
+                    <div class="ai-decision-panel" id="ai-decision-panel">
+                        <!-- JavaScript ile doldurulacak -->
+                    </div>
+                </div>
             </div>
         </div>
         
