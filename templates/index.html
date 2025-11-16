@@ -30,16 +30,14 @@
                     </div>
                 </div>
                 
-                <!-- Depth Control (sadece dev mode'da görünür) -->
-                <div class="control-section depth-section" id="depth-section">
-                    <h4 class="section-title">AI Search Depth</h4>
-                    <div class="depth-control">
-                        <div class="depth-header">
-                            <span class="depth-label">Depth:</span>
-                            <span class="depth-value" id="depth-value">8</span>
+                <!-- AI Depth Display (read-only) -->
+                <div class="control-section">
+                    <div class="ai-depth-display">
+                        <span class="depth-icon">🧠</span>
+                        <div class="depth-info-wrapper">
+                            <span class="depth-label-small">AI Search Depth</span>
+                            <span class="depth-value-badge" id="depth-value">6</span>
                         </div>
-                        <input type="range" id="depth-slider" min="1" max="12" value="8" class="depth-slider">
-                        <p class="depth-info">Higher = Stronger (slower)</p>
                     </div>
                 </div>
                 
@@ -69,7 +67,6 @@
             </div>
             
             <!-- Sağ Oyun Alanı -->
-            <div class="game-area"> -->
             <div class="game-area">
                 <div class="game-info">
                     <div class="status" id="game-status">Loading game...</div>

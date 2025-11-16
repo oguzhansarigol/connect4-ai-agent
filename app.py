@@ -10,8 +10,73 @@ from connect4.agent import get_best_move
 app = Flask(__name__)
 app.secret_key = 'connect4-secret-key'  # Session için gerekli
 
-# AI derinliği
-AI_DEPTH = 8
+# AI derinliği - Dinamik Yönetim
+AI_DEPTH_MIN = 4   # Minimum depth
+AI_DEPTH_MAX = 12  # Maximum depth
+AI_DEPTH_DEFAULT = 6  # Başlangıç depth'i
+TARGET_THINKING_TIME = 4.0  # Hedef düşünme süresi (saniye)
+DEPTH_ADJUSTMENT_THRESHOLD = 2.5  # Depth değiştirmek için eşik (saniye)
+MIN_ROUNDS_FOR_INCREASE = 4  # Depth artırmak için minimum tur sayısı
+MAX_RUNTIME_THRESHOLD = 6.0  # Depth azaltmak için maksimum süre (saniye)
+
+def adjust_depth_by_runtime(current_depth, actual_time, round_count, target_time=TARGET_THINKING_TIME):
+    """
+    Gerçek çalışma süresine göre depth'i dinamik olarak ayarla.
+    
+    Kurallar:
+    1. DEPTH ARTIRMA:
+       - runtime < (target_time - 2.5) VE
+       - En az 4 tur oynandı
+       → Depth +1
+    
+    2. DEPTH AZALTMA:
+       - runtime > (target_time + 2.5) VE
+       - runtime > 6 saniye
+       → Depth -1
+    
+    3. Aksi halde depth sabit kalır
+    
+    Args:
+        current_depth: Mevcut search depth
+        actual_time: Gerçekleşen düşünme süresi (saniye)
+        round_count: Oynanan toplam tur sayısı
+        target_time: Hedef düşünme süresi (saniye)
+    
+    Returns:
+        (yeni_depth, değişim_mesajı) tuple
+    """
+    lower_threshold = target_time - DEPTH_ADJUSTMENT_THRESHOLD  # 4.0 - 2.5 = 1.5s
+    upper_threshold = target_time + DEPTH_ADJUSTMENT_THRESHOLD  # 4.0 + 2.5 = 6.5s
+    
+    change_msg = None
+    
+    # KURAL 1: DEPTH ARTIRMA
+    if actual_time < lower_threshold and round_count >= MIN_ROUNDS_FOR_INCREASE:
+        new_depth = min(current_depth + 1, AI_DEPTH_MAX)
+        change_msg = f"⚡ Fast ({actual_time:.2f}s < {lower_threshold:.1f}s, Round≥{MIN_ROUNDS_FOR_INCREASE}) → +1 depth"
+        print(f"{change_msg}: {current_depth} → {new_depth}")
+        return new_depth, change_msg
+    
+    # KURAL 2: DEPTH AZALTMA (ama 6'nın altına düşmez)
+    elif actual_time > upper_threshold and actual_time > MAX_RUNTIME_THRESHOLD:
+        new_depth = max(current_depth - 1, AI_DEPTH_DEFAULT)  # AI_DEPTH_DEFAULT = 6
+        change_msg = f"🐌 Slow ({actual_time:.2f}s > {upper_threshold:.1f}s AND > {MAX_RUNTIME_THRESHOLD:.1f}s) → -1 depth"
+        print(f"{change_msg}: {current_depth} → {new_depth}")
+        return new_depth, change_msg
+    
+    # KURAL 3: DEPTH SABİT
+    else:
+        reason = ""
+        if actual_time < lower_threshold:
+            reason = f"but only {round_count} rounds (need ≥{MIN_ROUNDS_FOR_INCREASE})"
+        elif actual_time > upper_threshold:
+            reason = f"but runtime {actual_time:.2f}s ≤ {MAX_RUNTIME_THRESHOLD:.1f}s"
+        else:
+            reason = f"within acceptable range ({lower_threshold:.1f}s - {upper_threshold:.1f}s)"
+        
+        change_msg = f"✅ Keep depth={current_depth} ({reason})"
+        print(f"✅ AI runtime {actual_time:.2f}s → Keeping depth: {current_depth} ({reason})")
+        return current_depth, change_msg
 
 def create_game_session(first_player=None):
     """Yeni bir oyun oturumu oluşturur"""
@@ -25,7 +90,9 @@ def create_game_session(first_player=None):
         'turn': turn,
         'game_over': False,
         'winner': None,
-        'last_move': None
+        'last_move': None,
+        'move_count': 0,  # Hamle sayacı
+        'current_depth': AI_DEPTH_DEFAULT  # Başlangıç depth'i
     }
 
 def board_to_json(board):
@@ -61,13 +128,16 @@ def make_move():
     """Oyuncu hamlesi yapar"""
     data = request.get_json()
     col = int(data['column'])
-    depth = int(data.get('depth', AI_DEPTH))  # Depth parametresini al
     
     if 'game' not in session:
         session['game'] = create_game_session()
     
     game = session['game']
     board = game['board']
+    
+    # move_count yoksa ekle
+    if 'move_count' not in game:
+        game['move_count'] = 0
     
     # Oyun bitmiş mi kontrol et
     if game['game_over']:
@@ -82,6 +152,7 @@ def make_move():
         row = get_next_open_row(board, col)
         drop_piece(board, row, col, PLAYER_HUMAN)
         game['last_move'] = {'player': PLAYER_HUMAN, 'row': row, 'col': col}
+        game['move_count'] = game['move_count'] + 1  # Hamle sayacını artır
         
         # Kazanma kontrolü
         if winning_move(board, PLAYER_HUMAN):
@@ -110,14 +181,13 @@ def make_move():
 
 @app.route('/api/ai-move', methods=['POST'])
 def make_ai_move():
-    """AI hamlesini yapar"""
+    """AI hamlesini yapar - DİNAMİK DEPTH ile"""
     import time
     
     if 'game' not in session:
         return jsonify({'error': 'Oyun oturumu bulunamadı'}), 400
     
     data = request.get_json() or {}
-    depth = int(data.get('depth', AI_DEPTH))  # Depth parametresini al
     developer_mode = data.get('developer_mode', False)  # Developer mode kontrolü
     
     game = session['game']
@@ -125,6 +195,19 @@ def make_ai_move():
     
     if game['game_over'] or game['turn'] != PLAYER_AI:
         return jsonify({'error': 'AI hamle yapamaz'}), 400
+    
+    # Mevcut depth'i al veya başlangıç değerini kullan
+    current_depth = game.get('current_depth', AI_DEPTH_DEFAULT)
+    
+    # Toplam tur sayısını hesapla (move_count / 2 = tur sayısı)
+    move_count = game.get('move_count', 0)
+    round_count = (move_count + 1) // 2  # Her tur 2 hamle (insan + AI)
+    
+    # Kullanıcıdan gelen depth varsa kullan (eski davranış - artık yok)
+    if 'depth' in data:
+        depth = int(data['depth'])
+    else:
+        depth = current_depth  # Session'dan gelen depth'i kullan
     
     # AI hamlesini yap (developer mode ile veya olmadan)
     column_scores = None
@@ -135,9 +218,14 @@ def make_ai_move():
         ai_col = get_best_move(board, PLAYER_AI, depth, developer_mode=False)
     thinking_time = time.time() - start_time
     
+    # ⚡ RUNTIME-BASED DYNAMIC DEPTH ADJUSTMENT (YENİ KURALLAR)
+    new_depth, depth_change_msg = adjust_depth_by_runtime(depth, thinking_time, round_count, TARGET_THINKING_TIME)
+    game['current_depth'] = new_depth  # Yeni depth'i kaydet
+    
     ai_row = get_next_open_row(board, ai_col)
     drop_piece(board, ai_row, ai_col, PLAYER_AI)
     game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}
+    game['move_count'] = game.get('move_count', 0) + 1  # Hamle sayacını artır
     
     # Kazanma kontrolü
     if winning_move(board, PLAYER_AI):
@@ -162,7 +250,12 @@ def make_ai_move():
         'ai_move': {
             'row': ai_row, 
             'col': ai_col,
-            'thinking_time': round(thinking_time, 3)
+            'thinking_time': round(thinking_time, 3),
+            'depth': new_depth,  # YENİ depth'i frontend'e gönder
+            'previous_depth': depth,  # Önceki depth
+            'depth_changed': (new_depth != depth),  # Depth değişti mi?
+            'depth_change_msg': depth_change_msg,  # Değişim mesajı
+            'round_count': round_count  # Kaç tur oynandı (debug için)
         }
     }
     

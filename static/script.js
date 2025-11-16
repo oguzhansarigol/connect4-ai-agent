@@ -7,12 +7,14 @@ class Connect4Game {
         this.gameOver = false;
         this.winner = null;
         this.moveCount = 0;
-        this.aiDepth = 8; // Default depth
+        this.aiDepth = 6; // Default depth - SABIT (kullanıcı değiştiremiyor)
         this.devMode = false;
+        this.lastMove = null; // Son oynanan hamle
         
         this.initializeElements();
         this.bindEvents();
         this.loadGameState();
+        this.updateDepthDisplay(); // Depth'i UI'da göster
     }
     
     initializeElements() {
@@ -26,8 +28,6 @@ class Connect4Game {
         this.moveCountElement = document.getElementById('move-count');
         this.devModeToggle = document.getElementById('dev-mode-toggle');
         this.devSettings = document.getElementById('dev-settings');
-        this.depthSection = document.getElementById('depth-section');
-        this.depthSlider = document.getElementById('depth-slider');
         this.depthValue = document.getElementById('depth-value');
         this.modal = document.getElementById('modal-overlay');
         this.modalTitle = document.getElementById('modal-title');
@@ -42,12 +42,18 @@ class Connect4Game {
         this.startAiBtn.addEventListener('click', () => this.startNewGame('ai'));
         this.startRandomBtn.addEventListener('click', () => this.startNewGame('random'));
         this.devModeToggle.addEventListener('change', (e) => this.toggleDevMode(e.target.checked));
-        this.depthSlider.addEventListener('input', (e) => this.updateDepth(e.target.value));
         this.modalNewGameBtn.addEventListener('click', () => this.newGameFromModal());
         this.modalCloseBtn.addEventListener('click', () => this.hideModal());
         this.modal.addEventListener('click', (e) => {
             if (e.target === this.modal) this.hideModal();
         });
+    }
+    
+    updateDepthDisplay() {
+        // UI'da depth değerini güncelle
+        if (this.depthValue) {
+            this.depthValue.textContent = this.aiDepth;
+        }
     }
     
     async loadGameState() {
@@ -66,6 +72,7 @@ class Connect4Game {
         this.turn = data.turn;
         this.gameOver = data.game_over;
         this.winner = data.winner;
+        this.lastMove = data.last_move;  // Son hamleyi kaydet
         
         this.createBoard();
         this.createColumnButtons(data.valid_columns);
@@ -98,6 +105,11 @@ class Connect4Game {
                     cell.classList.add('human');
                 } else {
                     cell.classList.add('empty');
+                }
+                
+                // Son hamleyi işaretle (yeşil çember)
+                if (this.lastMove && this.lastMove.row === row && this.lastMove.col === col) {
+                    cell.classList.add('last-move');
                 }
                 
                 // Hücreye tıklama event'i ekle
@@ -161,29 +173,19 @@ class Connect4Game {
     toggleDevMode(enabled) {
         this.devMode = enabled;
         
-        // Depth section görünürlüğünü kontrol et
-        if (this.depthSection) {
-            if (enabled) {
-                this.depthSection.classList.add('active');
-            } else {
-                this.depthSection.classList.remove('active');
-            }
-        }
-        
         // AI Decision Panel görünürlüğünü kontrol et
         const aiDecisionPanel = document.getElementById('ai-decision-panel');
         if (aiDecisionPanel) {
             if (!enabled) {
-                // Developer mode kapandıysa paneli gizle
+                // Developer mode kapandıysa paneli gizle ve temizle
                 aiDecisionPanel.classList.remove('visible');
                 aiDecisionPanel.innerHTML = '';
             }
+            // Developer mode açıldığında eğer panelde içerik varsa göster
+            else if (aiDecisionPanel.innerHTML.trim() !== '') {
+                aiDecisionPanel.classList.add('visible');
+            }
         }
-    }
-    
-    updateDepth(value) {
-        this.aiDepth = parseInt(value);
-        this.depthValue.textContent = value;
     }
     
     updateMoveCount() {
@@ -293,6 +295,22 @@ class Connect4Game {
             
             this.moveCount++;
             
+            // Backend'den depth bilgisi gelirse güncelle (dinamik depth yönetimi)
+            if (data.ai_move && data.ai_move.depth !== undefined) {
+                const previousDepth = this.aiDepth;
+                this.aiDepth = data.ai_move.depth;
+                this.updateDepthDisplay();
+                
+                // Depth değişimini kullanıcıya göster
+                if (data.ai_move.depth_changed && data.ai_move.depth_change_msg) {
+                    this.showDepthChangeNotification(
+                        data.ai_move.previous_depth, 
+                        data.ai_move.depth,
+                        data.ai_move.depth_change_msg
+                    );
+                }
+            }
+            
             // Developer mode ise skorları göster
             if (this.devMode && data.ai_move) {
                 const aiScores = data.ai_move.column_scores || null;
@@ -308,6 +326,48 @@ class Connect4Game {
             console.error('AI hamle yapılırken hata:', error);
             alert('AI hamle yapılırken hata oluştu: ' + error.message);
         }
+    }
+    
+    showDepthChangeNotification(oldDepth, newDepth, message) {
+        // Depth değişim bildirimini göster
+        const depthBadge = document.querySelector('.depth-value-badge');
+        if (!depthBadge) return;
+        
+        // Animasyon için class ekle
+        depthBadge.classList.add('depth-changing');
+        
+        // Konsola bilgi ver
+        console.log(`🔄 Depth Change: ${oldDepth} → ${newDepth} (${message})`);
+        
+        // Kısa bir süre sonra animasyonu kaldır
+        setTimeout(() => {
+            depthBadge.classList.remove('depth-changing');
+        }, 1500);
+        
+        // Toast notification göster (opsiyonel)
+        this.showToast(`AI Depth: ${oldDepth} → ${newDepth}`, message);
+    }
+    
+    showToast(title, message) {
+        // Basit toast notification
+        const existingToast = document.querySelector('.depth-toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+        
+        const toast = document.createElement('div');
+        toast.className = 'depth-toast';
+        toast.innerHTML = `
+            <div class="toast-title">${title}</div>
+            <div class="toast-message">${message}</div>
+        `;
+        document.body.appendChild(toast);
+        
+        // 3 saniye sonra kaldır
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
     }
     
     showGameOverModal() {
@@ -358,6 +418,18 @@ class Connect4Game {
         if (thinkingTime !== null) {
             html += `<div class="thinking-time">⏱️ Thinking Time: ${thinkingTime}s</div>`;
         }
+        
+        // Aktif optimizasyonları göster
+        html += '<div class="optimizations-info">';
+        html += '<strong>🚀 Active Optimizations:</strong><br>';
+        html += '✓ Alpha-Beta Pruning<br>';
+        html += '✓ Move Ordering<br>';
+        html += '✓ Transposition Table<br>';
+        html += '✓ Threat Detection<br>';
+        html += '✓ Killer Moves<br>';
+        html += '✓ Center Column Bonus<br>';
+        html += '✓ Window Evaluation<br>';
+        html += '</div>';
         
         html += '<div class="scores-container">';
         
