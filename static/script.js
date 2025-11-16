@@ -19,9 +19,7 @@ class Connect4Game {
         this.boardElement = document.getElementById('board');
         this.columnButtonsElement = document.getElementById('column-buttons');
         this.resetBtn = document.getElementById('reset-btn');
-        this.hintBtn = document.getElementById('hint-btn');
         this.moveCountElement = document.getElementById('move-count');
-        this.aiTimeElement = document.getElementById('ai-time');
         this.modal = document.getElementById('modal-overlay');
         this.modalTitle = document.getElementById('modal-title');
         this.modalMessage = document.getElementById('modal-message');
@@ -31,7 +29,6 @@ class Connect4Game {
     
     bindEvents() {
         this.resetBtn.addEventListener('click', () => this.resetGame());
-        this.hintBtn.addEventListener('click', () => this.showHint());
         this.modalNewGameBtn.addEventListener('click', () => this.newGameFromModal());
         this.modalCloseBtn.addEventListener('click', () => this.hideModal());
         this.modal.addEventListener('click', (e) => {
@@ -139,7 +136,6 @@ class Connect4Game {
     async makeMove(col) {
         if (this.gameOver || this.turn !== -1) return;
         
-        const startTime = Date.now();
         this.disableColumnButtons();
         this.updateStatus();
         
@@ -161,13 +157,6 @@ class Connect4Game {
             this.moveCount++;
             this.updateGameState(data);
             
-            // AI düşünme süresini hesapla
-            if (data.ai_move) {
-                const endTime = Date.now();
-                this.aiThinkingTime = ((endTime - startTime) / 1000).toFixed(1);
-                this.aiTimeElement.textContent = `${this.aiThinkingTime}s`;
-            }
-            
         } catch (error) {
             console.error('Hamle yapılırken hata:', error);
             alert('Hamle yapılırken hata oluştu: ' + error.message);
@@ -185,8 +174,6 @@ class Connect4Game {
             const data = await response.json();
             
             this.moveCount = 0;
-            this.aiThinkingTime = 0;
-            this.aiTimeElement.textContent = '-';
             this.updateGameState(data);
             this.hideModal();
             
@@ -194,11 +181,6 @@ class Connect4Game {
             console.error('Oyun sıfırlanırken hata:', error);
             alert('Oyun sıfırlanırken hata oluştu!');
         }
-    }
-    
-    showHint() {
-        // Bu özellik gelecekte AI'ın önerdiği hamleyi gösterebilir
-        alert('İpucu özelliği henüz geliştirilmedi!');
     }
     
     showGameOverModal() {

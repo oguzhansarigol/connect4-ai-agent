@@ -244,21 +244,7 @@ header h1 {
     transform: translateY(-2px);
 }
 
-.hint-btn {
-    background: var(--warning-color);
-    color: white;
-}
 
-.hint-btn:hover:not(:disabled) {
-    background: #d68910;
-    transform: translateY(-2px);
-}
-
-.hint-btn:disabled {
-    background: #bdc3c7;
-    cursor: not-allowed;
-    opacity: 0.6;
-}
 
 .game-stats {
     display: flex;
