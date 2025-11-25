@@ -35,7 +35,8 @@ def evaluate_window(window, piece):
     """
     Pencere değerlendirme + THREAT DETECTION
     
-    İyileştirme: Rakibin 3-taş tehditlerini çok daha ağır cezalandırıyoruz
+    DÜZELTME: Sadece belirtilen oyuncu (piece) için pozitif skor döndürür.
+    Rakip skorları score_position() içinde ayrı hesaplanacak.
     """
     score = 0
     opponent_piece = PLAYER_HUMAN if piece == PLAYER_AI else PLAYER_AI
@@ -53,10 +54,11 @@ def evaluate_window(window, piece):
         score += 3   # 2-in-a-row potansiyeli
 
     # THREAT DETECTION: Rakibin tehditlerini agresif engelle
+    # NOT: Rakip skorları score_position'da çıkarılacak, burada sadece tehdit tespiti
     if opponent_count == 3 and empty_count == 1:
-        score -= 1000  #  ACİL TEHDİT! (Artırıldı: 80 -> 1000)
+        score -= 80  # ACİL TEHDİT! (daha dengeli değer)
     elif opponent_count == 2 and empty_count == 2:
-        score -= 5     # Potansiyel tehdit
+        score -= 5   # Potansiyel tehdit
 
     return score
 
@@ -64,7 +66,8 @@ def score_position(board, piece):
     """
     Pozisyon değerlendirme (cached + evaluation board)
     
-    İyileştirme: Stratejik pozisyonlara bonus puan ekledik
+    DÜZELTME: AI_skoru - Rakip_skoru hesabı yapılıyor.
+    Bu sayede pozitif skor AI lehine, negatif skor Rakip lehine demek.
     """
     # Transposition table check
     board_hash = hash_board(board)
@@ -72,6 +75,7 @@ def score_position(board, piece):
         return transposition_table[board_hash]
     
     score = 0
+    opponent = PLAYER_HUMAN if piece == PLAYER_AI else PLAYER_AI
     
     # EVALUATION BOARD: Stratejik pozisyonlara bonus
     # Merkez ve alt sıralar daha değerli (daha fazla kazanma kombinasyonu)
@@ -84,25 +88,28 @@ def score_position(board, piece):
         [3, 4, 5, 7, 5, 4, 3]   # Alt sıra
     ]
     
-    # Pozisyon bonusları ekle
+    # Pozisyon bonusları ekle (AI - Rakip)
     for r in range(ROWS):
         for c in range(COLS):
             if board[r][c] == piece:
                 score += evaluation_board[r][c]
-            elif board[r][c] != EMPTY:  # Rakip
+            elif board[r][c] == opponent:
                 score -= evaluation_board[r][c]
 
-    # Merkez sütun ekstra bonusu (zaten önemliydi)
+    # Merkez sütun ekstra bonusu
     center_array = [board[r][COLS//2] for r in range(ROWS)]
     center_count = center_array.count(piece)
-    score += center_count * 3  # Evaluation board'da zaten var, sadece +3 ekstra
+    opponent_center = center_array.count(opponent)
+    score += (center_count - opponent_center) * 3
 
-    # Yatay kontrol
+    # Yatay kontrol (AI pencerelerini ekle, Rakip pencerelerini çıkar)
     for r in range(ROWS):
         row_array = board[r]
         for c in range(COLS - 3):
             window = row_array[c:c+WINDOW_LENGTH]
             score += evaluate_window(window, piece)
+            # Rakip için aynı pencereyi ters yönde değerlendir
+            score -= evaluate_window(window, opponent)
 
     # Dikey kontrol
     for c in range(COLS):
@@ -110,18 +117,21 @@ def score_position(board, piece):
         for r in range(ROWS - 3):
             window = col_array[r:r+WINDOW_LENGTH]
             score += evaluate_window(window, piece)
+            score -= evaluate_window(window, opponent)
 
     # Pozitif eğimli çapraz (/), sol alt -> sağ üst
     for r in range(ROWS - 3):
         for c in range(COLS - 3):
             window = [board[r+i][c+i] for i in range(WINDOW_LENGTH)]
             score += evaluate_window(window, piece)
+            score -= evaluate_window(window, opponent)
 
     # Negatif eğimli çapraz (\), sol üst -> sağ alt
     for r in range(3, ROWS):
         for c in range(COLS - 3):
             window = [board[r-i][c+i] for i in range(WINDOW_LENGTH)]
             score += evaluate_window(window, piece)
+            score -= evaluate_window(window, opponent)
 
     # Cache'e kaydet
     transposition_table[board_hash] = score
@@ -172,11 +182,11 @@ def order_moves(board, valid_locations, piece, depth):
         priority = 0
         row = get_next_open_row(board, col)
         
-        # 1. KAZANMA HAMLESİ?
+        # 1. KAZANMA HAMLESİ? (En yüksek öncelik ama hepsini değerlendir)
         temp_board = [row[:] for row in board]
         drop_piece(temp_board, row, col, piece)
         if winning_move(temp_board, piece):
-            return [col]  # Hemen oyna!
+            priority += 100000000  # Kazanma hamlesine çok yüksek öncelik (ama tüm kazanmaları değerlendir)
         
         # 2. ACİL TEHDİT BLOKLAMA?
         if col in threat_cols:
@@ -216,9 +226,11 @@ def minimax_optimized(board, depth, alpha, beta, maximizing_player):
     if depth == 0 or is_terminal:
         if is_terminal:
             if winning_move(board, PLAYER_AI):
-                return (None, 10000000 + depth)  # Depth bonusu (erken kazanma)
+                # Erken kazanma DAHA YÜKSEK skor (depth'i ÇIKAR)
+                return (None, 10000000 - depth)  # depth=8: 9999992, depth=1: 9999999 ✅
             elif winning_move(board, PLAYER_HUMAN):
-                return (None, -10000000 - depth)  # Depth bonusu (geç kaybetme)
+                # Geç kaybetme DAHA YÜKSEK skor (depth'i EKLE)
+                return (None, -10000000 + depth)  # depth=8: -9999992, depth=1: -9999999 ✅
             else:
                 return (None, 0)
         else:
