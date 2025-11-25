@@ -31,7 +31,7 @@
                 </div>
                 
                 <!-- AI Depth Display (read-only) -->
-                <div class="control-section">
+                <div class="control-section" id="depth-section">
                     <div class="ai-depth-display">
                         <span class="depth-icon">🧠</span>
                         <div class="depth-info-wrapper">
@@ -89,8 +89,8 @@
                     </div>
                 </div>
                 
-                <div class="game-content">
-                    <div class="game-board" id="game-board">
+                <div class="game-layout">
+                    <div class="game-content">
                         <!-- Sütun butonları -->
                         <div class="column-buttons" id="column-buttons">
                             <!-- JavaScript ile oluşturulacak -->
@@ -100,9 +100,14 @@
                         <div class="board" id="board">
                             <!-- JavaScript ile oluşturulacak -->
                         </div>
+                        
+                        <!-- Game Theory Model Panel (tahtanın altında, sadece Developer Mode'da görünür) -->
+                        <div class="game-theory-panel" id="game-theory-panel">
+                            <!-- JavaScript ile doldurulacak -->
+                        </div>
                     </div>
                     
-                    <!-- AI Decision Process (sadece Developer Mode'da görünür) -->
+                    <!-- AI Decision Process (sağda, sadece Developer Mode'da görünür) -->
                     <div class="ai-decision-panel" id="ai-decision-panel">
                         <!-- JavaScript ile doldurulacak -->
                     </div>

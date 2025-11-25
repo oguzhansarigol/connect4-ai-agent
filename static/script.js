@@ -30,6 +30,7 @@ class Connect4Game {
         this.devModeToggle = document.getElementById('dev-mode-toggle');
         this.devSettings = document.getElementById('dev-settings');
         this.depthValue = document.getElementById('depth-value');
+        this.depthSection = document.getElementById('depth-section');
         this.modal = document.getElementById('modal-overlay');
         this.modalTitle = document.getElementById('modal-title');
         this.modalMessage = document.getElementById('modal-message');
@@ -185,6 +186,15 @@ class Connect4Game {
     toggleDevMode(enabled) {
         this.devMode = enabled;
         
+        // AI Search Depth görünürlüğünü kontrol et
+        if (this.depthSection) {
+            if (enabled) {
+                this.depthSection.style.display = 'flex';
+            } else {
+                this.depthSection.style.display = 'none';
+            }
+        }
+        
         // AI Decision Panel görünürlüğünü kontrol et
         const aiDecisionPanel = document.getElementById('ai-decision-panel');
         if (aiDecisionPanel) {
@@ -196,6 +206,18 @@ class Connect4Game {
             // Developer mode açıldığında eğer panelde içerik varsa göster
             else if (aiDecisionPanel.innerHTML.trim() !== '') {
                 aiDecisionPanel.classList.add('visible');
+            }
+        }
+        
+        // Game Theory Panel görünürlüğünü kontrol et
+        const gameTheoryPanel = document.getElementById('game-theory-panel');
+        if (gameTheoryPanel) {
+            if (!enabled) {
+                gameTheoryPanel.classList.remove('visible');
+                gameTheoryPanel.innerHTML = '';
+            }
+            else if (gameTheoryPanel.innerHTML.trim() !== '') {
+                gameTheoryPanel.classList.add('visible');
             }
         }
     }
@@ -428,7 +450,40 @@ class Connect4Game {
             return;
         }
         
-        // Skor panelini oluştur veya güncelle
+        // ============================================================
+        // 1. GAME THEORY MODEL PANEL (Ayrı Panel - Tahtanın Altında)
+        // ============================================================
+        let gameTheoryPanel = document.getElementById('game-theory-panel');
+        if (gameTheoryPanel) {
+            // Dinamik değerler hesapla
+            const validCols = [];
+            for (let col = 0; col < 7; col++) {
+                if (columnScores[col] !== undefined && columnScores[col] !== null) {
+                    validCols.push(col + 1);
+                }
+            }
+            const actionsStr = validCols.length > 0 ? validCols.join(', ') : 'None';
+            
+            let theoryHtml = '';
+            theoryHtml += '<div class="game-theory-header">📚 Game Theory Model</div>';
+            theoryHtml += '<div class="game-theory-content">';
+            theoryHtml += '<ul class="theory-list">';
+            theoryHtml += '<li><strong>S₀:</strong> Initial state (empty 6×7 board)</li>';
+            theoryHtml += `<li><strong>TO-MOVE(s):</strong> ${this.turn === 1 ? 'AI (Yellow)' : 'Human (Red)'}</li>`;
+            theoryHtml += `<li><strong>ACTIONS(s):</strong> Valid columns: {${actionsStr}}</li>`;
+            theoryHtml += `<li><strong>RESULT(s,a):</strong> Drop disc in column a → New 6×7 state</li>`;
+            theoryHtml += `<li><strong>IS-TERMINAL(s):</strong> ${this.gameOver ? 'Yes (Game Over)' : 'No (Game continues)'}</li>`;
+            theoryHtml += '<li><strong>UTILITY(s,p):</strong> +1000 (win), -1000 (lose), 0 (draw)</li>';
+            theoryHtml += '</ul>';
+            theoryHtml += '</div>';
+            
+            gameTheoryPanel.innerHTML = theoryHtml;
+            gameTheoryPanel.classList.add('visible');
+        }
+        
+        // ============================================================
+        // 2. AI DECISION PROCESS PANEL (Sağda - Skor + Optimizasyonlar)
+        // ============================================================
         let scorePanel = document.getElementById('ai-decision-panel');
         if (!scorePanel) {
             return;
@@ -440,25 +495,16 @@ class Connect4Game {
         const minScore = Math.min(...scores);
         const scoreRange = maxScore - minScore || 1;
         
-        let html = '<div class="score-header">🔍 AI Decision Process</div>';
+        let html = '';
+        
+        // DECISION PROCESS SECTION (Column Scores)
+        html += '<div class="score-header">🔍 Decision Process</div>';
         html += '<div class="score-subtitle">Column Evaluations (Minimax Scores)</div>';
         
         // AI düşünme süresini göster
         if (thinkingTime !== null) {
-            html += `<div class="thinking-time">⏱️ Thinking Time: ${thinkingTime}s</div>`;
+            html += `<div class="thinking-time">⏱️ Thinking Time: ${thinkingTime}s | Depth: ${this.aiDepth}</div>`;
         }
-        
-        // Aktif optimizasyonları göster
-        html += '<div class="optimizations-info">';
-        html += '<strong>🚀 Active Optimizations:</strong><br>';
-        html += '✓ Alpha-Beta Pruning<br>';
-        html += '✓ Move Ordering<br>';
-        html += '✓ Transposition Table<br>';
-        html += '✓ Threat Detection<br>';
-        html += '✓ Killer Moves<br>';
-        html += '✓ Center Column Bonus<br>';
-        html += '✓ Window Evaluation<br>';
-        html += '</div>';
         
         html += '<div class="scores-container">';
         
@@ -507,6 +553,20 @@ class Connect4Game {
         html += '<div class="score-legend">';
         html += '<span>💡 Higher = Better for AI</span> | ';
         html += '<span>🎯 Negative = Risky</span>';
+        html += '</div>';
+        
+        // AI OPTIMIZATIONS SECTION (Decision Process'in altında)
+        html += '<div class="optimizations-section">';
+        html += '<div class="optimizations-header">🚀 AI Optimizations</div>';
+        html += '<div class="optimizations-grid">';
+        html += '<div class="opt-item"><span class="opt-check">✓</span> Alpha-Beta Pruning</div>';
+        html += '<div class="opt-item"><span class="opt-check">✓</span> Move Ordering</div>';
+        html += '<div class="opt-item"><span class="opt-check">✓</span> Transposition Table</div>';
+        html += '<div class="opt-item"><span class="opt-check">✓</span> Threat Detection</div>';
+        html += '<div class="opt-item"><span class="opt-check">✓</span> Killer Moves</div>';
+        html += '<div class="opt-item"><span class="opt-check">✓</span> Center Column Bonus</div>';
+        html += '<div class="opt-item"><span class="opt-check">✓</span> Window Evaluation</div>';
+        html += '</div>';
         html += '</div>';
         
         scorePanel.innerHTML = html;

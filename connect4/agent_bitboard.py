@@ -19,7 +19,8 @@ OPTIMIZATIONS:
 
 import time
 from typing import List, Tuple, Dict, Optional
-from .bitboard_engine import Bitboard, evaluate_bitboard, ROWS, COLS, PLAYER_AI, PLAYER_HUMAN
+from .bitboard_engine import Bitboard, ROWS, COLS, PLAYER_AI, PLAYER_HUMAN
+from .agent import score_position  # Use traditional evaluation!
 
 # ============================================================================
 # CONFIGURATION
@@ -60,6 +61,27 @@ def bitboard_from_2d(board: List[List[int]]) -> Bitboard:
                 bitboard.make_move(col, 1)  # 1 = Human in bitboard
     
     return bitboard
+
+
+def bitboard_to_2d(bitboard: Bitboard) -> List[List[int]]:
+    """
+    Convert Bitboard to 2D board (game.py format)
+    
+    bitboard: PLAYER_AI=0, PLAYER_HUMAN=1
+    game.py: PLAYER_AI=1, PLAYER_HUMAN=-1, EMPTY=0
+    """
+    board = [[0 for _ in range(COLS)] for _ in range(ROWS)]
+    
+    for row in range(ROWS):
+        for col in range(COLS):
+            cell = bitboard.get_cell(row, col)
+            if cell == 0:  # AI in bitboard
+                board[row][col] = 1  # AI in game.py
+            elif cell == 1:  # Human in bitboard
+                board[row][col] = -1  # Human in game.py
+            # else: EMPTY (2) stays 0
+    
+    return board
 
 
 def bitboard_hash(bitboard: Bitboard) -> int:
@@ -176,7 +198,15 @@ def minimax_bitboard(
     
     # Depth limit reached
     if depth == 0:
-        score = evaluate_bitboard(bitboard)
+        # Convert bitboard to 2D array and use traditional evaluation
+        board_2d = bitboard_to_2d(bitboard)
+        # Evaluate from AI perspective (piece=1 in game.py format)
+        score = score_position(board_2d, 1)  # 1 = PLAYER_AI in game.py
+        
+        # If maximizing_player=False, we're minimizing for AI, so negate
+        if not maximizing_player:
+            score = -score
+        
         return score, None
     
     # Get valid moves
@@ -341,7 +371,7 @@ def get_best_move_bitboard(
     start_time = time.time()
     
     column_scores = {}
-    best_score = float('-inf') if player == 1 else float('inf')
+    best_score = float('-inf')  # Always maximize from current player's perspective
     best_col = valid_moves[0] if valid_moves else 3
     
     for col in valid_moves:
@@ -351,38 +381,29 @@ def get_best_move_bitboard(
         new_bitboard.heights = bitboard.heights.copy()
         new_bitboard.make_move(col, player_bit)
         
-        # Minimax search
-        if player == 1:  # AI maximizing
-            score, _ = minimax_bitboard(
-                new_bitboard,
-                depth - 1,
-                float('-inf'),
-                float('inf'),
-                False,
-                opponent_bit,
-                col
-            )
-        else:  # Human minimizing (shouldn't happen in practice)
-            score, _ = minimax_bitboard(
-                new_bitboard,
-                depth - 1,
-                float('-inf'),
-                float('inf'),
-                True,
-                opponent_bit,
-                col
-            )
+        # Minimax search (always start maximizing for current player)
+        # After we move, it's opponent's turn (minimizing)
+        score, _ = minimax_bitboard(
+            new_bitboard,
+            depth - 1,
+            float('-inf'),
+            float('inf'),
+            False,  # Opponent minimizes
+            opponent_bit,
+            col
+        )
+        
+        # If playing as PLAYER_HUMAN (-1), flip score to match perspective
+        # Evaluation is always from AI perspective, so flip for Human
+        if player == -1:
+            score = -score
         
         column_scores[col] = score
         
-        if player == 1:  # Maximizing
-            if score > best_score:
-                best_score = score
-                best_col = col
-        else:  # Minimizing
-            if score < best_score:
-                best_score = score
-                best_col = col
+        # Always maximize (finding best move for current player)
+        if score > best_score:
+            best_score = score
+            best_col = col
     
     thinking_time = time.time() - start_time
     
