@@ -15,7 +15,7 @@ app = Flask(__name__)
 app.secret_key = 'connect4-secret-key'  # Session için gerekli
 
 # AI Configuration
-USE_BITBOARD_MINIMAX = True  # Set to True to use bitboard-optimized minimax
+USE_BITBOARD_MINIMAX = False  # Set to True to use bitboard-optimized minimax
 
 # AI derinliği - Dinamik Yönetim
 AI_DEPTH_MIN = 4   # Minimum depth
