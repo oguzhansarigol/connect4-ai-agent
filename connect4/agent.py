@@ -303,6 +303,8 @@ def get_best_move_optimized(board, piece, depth, developer_mode=False):
     depth=8-12 ile bile hızlı çalışır!
     
     İyileştirmeler:
+    - ÖNCELİKLE ANINDA KAZANMA KONTROLÜ!
+    - SONRA ANINDA TEHDİT BLOKLAMA!
     - Transposition table temizleme
     - Killer moves temizleme
     - Developer mode için detaylı skorlar
@@ -312,9 +314,40 @@ def get_best_move_optimized(board, piece, depth, developer_mode=False):
     transposition_table.clear()
     killer_moves.clear()
     
+    valid_locations = get_valid_locations(board)
+    opponent = PLAYER_HUMAN if piece == PLAYER_AI else PLAYER_AI
+    
+    # 1. ÖNCELİKLE: ANINDA KAZANMA HAMLESİ VAR MI?
+    for col in valid_locations:
+        row = get_next_open_row(board, col)
+        temp_board = [row[:] for row in board]
+        drop_piece(temp_board, row, col, piece)
+        if winning_move(temp_board, piece):
+            # KAZANMA HAMLESİNİ HEMEN OYNA!
+            if developer_mode:
+                column_scores = {c: -999999 for c in valid_locations}
+                column_scores[col] = 10000000  # Kazanan hamle
+                return col, column_scores
+            else:
+                return col
+    
+    # 2. RAKİP BİR SONRAKI TURDA KAZANACAK MI? BLOKLA!
+    for col in valid_locations:
+        row = get_next_open_row(board, col)
+        temp_board = [row[:] for row in board]
+        drop_piece(temp_board, row, col, opponent)
+        if winning_move(temp_board, opponent):
+            # BLOKLAMA HAMLESİ GEREKLI!
+            if developer_mode:
+                column_scores = {c: -999999 for c in valid_locations}
+                column_scores[col] = 9000000  # Blok hamle (kazanmadan biraz düşük)
+                return col, column_scores
+            else:
+                return col
+    
+    # 3. Ne kazanma ne de acil blok yoksa minimax ile ara
     if developer_mode:
         # Tüm sütunların skorlarını hesapla
-        valid_locations = get_valid_locations(board)
         column_scores = {}
         
         for col in valid_locations:
@@ -322,12 +355,7 @@ def get_best_move_optimized(board, piece, depth, developer_mode=False):
             temp_board = [row[:] for row in board]
             drop_piece(temp_board, row, col, piece)
             
-            # Shallow evaluation
-            if winning_move(temp_board, piece):
-                score = 10000000
-            else:
-                score = minimax_optimized(temp_board, depth-1, -math.inf, math.inf, False)[1]
-            
+            score = minimax_optimized(temp_board, depth-1, -math.inf, math.inf, False)[1]
             column_scores[col] = score
         
         # En iyi hamleyi bul

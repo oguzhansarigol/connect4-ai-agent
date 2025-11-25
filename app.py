@@ -1,14 +1,21 @@
 from flask import Flask, render_template, request, jsonify, session
 import random
+import time
 from connect4.game import (
     create_board, drop_piece, is_valid_location,
     get_next_open_row, winning_move, get_valid_locations,
     PLAYER_HUMAN, PLAYER_AI, COLS, ROWS
 )
 from connect4.agent import get_best_move
+from connect4.agent_bitboard import get_best_move_bitboard  # Bitboard-optimized Minimax
+from connect4.mcts_agent import get_best_move_mcts, MCTS_ITERATIONS
+from connect4.mcts_agent_v2 import get_best_move_mcts_v2, MCTS_ITERATIONS as MCTS_ITERATIONS_V2  # Production MCTS
 
 app = Flask(__name__)
 app.secret_key = 'connect4-secret-key'  # Session için gerekli
+
+# AI Configuration
+USE_BITBOARD_MINIMAX = True  # Set to True to use bitboard-optimized minimax
 
 # AI derinliği - Dinamik Yönetim
 AI_DEPTH_MIN = 4   # Minimum depth
@@ -213,9 +220,15 @@ def make_ai_move():
     column_scores = None
     start_time = time.time()
     if developer_mode:
-        ai_col, column_scores = get_best_move(board, PLAYER_AI, depth, developer_mode=True)
+        if USE_BITBOARD_MINIMAX:
+            ai_col, column_scores = get_best_move_bitboard(board, PLAYER_AI, depth, developer_mode=True)
+        else:
+            ai_col, column_scores = get_best_move(board, PLAYER_AI, depth, developer_mode=True)
     else:
-        ai_col = get_best_move(board, PLAYER_AI, depth, developer_mode=False)
+        if USE_BITBOARD_MINIMAX:
+            ai_col, _ = get_best_move_bitboard(board, PLAYER_AI, depth, developer_mode=False)
+        else:
+            ai_col = get_best_move(board, PLAYER_AI, depth, developer_mode=False)
     thinking_time = time.time() - start_time
     
     # ⚡ RUNTIME-BASED DYNAMIC DEPTH ADJUSTMENT (YENİ KURALLAR)
@@ -277,7 +290,9 @@ def reset_game():
     else:
         first_player = None
     
+    # Yeni oyun başlarken depth'i default değere sıfırla
     session['game'] = create_game_session(first_player)
+    session['game']['current_depth'] = AI_DEPTH_DEFAULT  # 6'ya resetle
     session.modified = True
     
     game = session['game']
@@ -289,6 +304,381 @@ def reset_game():
         'last_move': game['last_move'],
         'valid_columns': get_valid_locations(game['board'])
     })
+
+
+@app.route('/api/ai-vs-ai-minimax', methods=['POST'])
+def ai_vs_ai_minimax():
+    """
+    AI vs AI: Minimax hamlesini yapar
+    """
+    if 'game' not in session:
+        session['game'] = create_game_session(PLAYER_AI)
+    
+    game = session['game']
+    board = game['board']
+    
+    if 'move_count' not in game:
+        game['move_count'] = 0
+    if 'current_depth' not in game:
+        game['current_depth'] = AI_DEPTH_DEFAULT
+    
+    # Oyun bitmiş mi?
+    if game['game_over']:
+        return jsonify({'error': 'Game is already over'}), 400
+    
+    # Minimax hamlesi
+    minimax_start = time.time()
+    depth = game['current_depth']
+    round_count = game['move_count']
+    
+    if USE_BITBOARD_MINIMAX:
+        minimax_col, column_scores = get_best_move_bitboard(
+            board, 
+            PLAYER_AI, 
+            depth=depth,
+            developer_mode=True
+        )
+    else:
+        minimax_col, column_scores = get_best_move(
+            board, 
+            PLAYER_AI, 
+            depth=depth,
+            developer_mode=True
+        )
+    
+    minimax_time = time.time() - minimax_start
+    
+    # Minimax hamlesini uygula
+    if not is_valid_location(board, minimax_col):
+        return jsonify({'error': 'Invalid Minimax move'}), 500
+    
+    minimax_row = get_next_open_row(board, minimax_col)
+    drop_piece(board, minimax_row, minimax_col, PLAYER_AI)
+    game['move_count'] += 1
+    
+    # Kazandı mı?
+    if winning_move(board, PLAYER_AI):
+        game['game_over'] = True
+        game['winner'] = 'minimax'
+        session.modified = True
+        
+        return jsonify({
+            'game_over': True,
+            'winner': 'minimax',
+            'board': board_to_json(board),
+            'move': {
+                'row': minimax_row,
+                'col': minimax_col,
+                'thinking_time': round(minimax_time, 3),
+                'depth': depth,
+                'heuristic': column_scores.get(minimax_col, 0) if column_scores else 0,
+                'algorithm': 'Alpha-Beta Pruning'
+            }
+        })
+    
+    # Tahta doldu mu?
+    if not get_valid_locations(board):
+        game['game_over'] = True
+        game['winner'] = 'draw'
+        session.modified = True
+        
+        return jsonify({
+            'game_over': True,
+            'winner': 'draw',
+            'board': board_to_json(board),
+            'move': {
+                'row': minimax_row,
+                'col': minimax_col,
+                'thinking_time': round(minimax_time, 3),
+                'depth': depth,
+                'heuristic': column_scores.get(minimax_col, 0) if column_scores else 0,
+                'algorithm': 'Alpha-Beta Pruning'
+            }
+        })
+    
+    # Depth ayarlama
+    new_depth, depth_change_msg = adjust_depth_by_runtime(
+        depth, minimax_time, round_count
+    )
+    game['current_depth'] = new_depth
+    session.modified = True
+    
+    return jsonify({
+        'game_over': False,
+        'board': board_to_json(board),
+        'move': {
+            'row': minimax_row,
+            'col': minimax_col,
+            'thinking_time': round(minimax_time, 3),
+            'depth': depth,
+            'new_depth': new_depth,
+            'heuristic': column_scores.get(minimax_col, 0) if column_scores else 0,
+            'algorithm': 'Alpha-Beta Pruning',
+            'depth_change_msg': depth_change_msg
+        }
+    })
+
+
+@app.route('/api/ai-vs-ai-mcts', methods=['POST'])
+def ai_vs_ai_mcts():
+    """
+    AI vs AI: MCTS hamlesini yapar
+    """
+    if 'game' not in session:
+        return jsonify({'error': 'No active game'}), 400
+    
+    game = session['game']
+    board = game['board']
+    
+    # Oyun bitmiş mi?
+    if game['game_over']:
+        return jsonify({'error': 'Game is already over'}), 400
+    
+    # MCTS hamlesi (V2 - Production Optimized)
+    mcts_start = time.time()
+    
+    mcts_col, mcts_stats = get_best_move_mcts_v2(
+        board,
+        PLAYER_HUMAN,  # MCTS plays as PLAYER_HUMAN
+        iterations=MCTS_ITERATIONS_V2,  # Use V2's higher iteration count
+        time_limit=5.0,
+        developer_mode=True
+    )
+    
+    mcts_time = time.time() - mcts_start
+    
+    # MCTS hamlesini uygula
+    if not is_valid_location(board, mcts_col):
+        return jsonify({'error': 'Invalid MCTS move'}), 500
+    
+    mcts_row = get_next_open_row(board, mcts_col)
+    drop_piece(board, mcts_row, mcts_col, PLAYER_HUMAN)
+    game['move_count'] += 1
+    
+    # Kazandı mı?
+    if winning_move(board, PLAYER_HUMAN):
+        game['game_over'] = True
+        game['winner'] = 'mcts'
+        session.modified = True
+        
+        return jsonify({
+            'game_over': True,
+            'winner': 'mcts',
+            'board': board_to_json(board),
+            'move': {
+                'row': mcts_row,
+                'col': mcts_col,
+                'thinking_time': round(mcts_time, 3),
+                'iterations': mcts_stats.get('iterations', MCTS_ITERATIONS),
+                'exploration_constant': mcts_stats.get('exploration_constant', 0.9),
+                'algorithm': 'Monte Carlo Tree Search'
+            }
+        })
+    
+    # Tahta doldu mu?
+    if not get_valid_locations(board):
+        game['game_over'] = True
+        game['winner'] = 'draw'
+        session.modified = True
+    
+    session.modified = True
+    
+    return jsonify({
+        'game_over': game['game_over'],
+        'winner': game.get('winner'),
+        'board': board_to_json(board),
+        'move': {
+            'row': mcts_row,
+            'col': mcts_col,
+            'thinking_time': round(mcts_time, 3),
+            'iterations': mcts_stats.get('iterations', MCTS_ITERATIONS),
+            'exploration_constant': mcts_stats.get('exploration_constant', 0.9),
+            'algorithm': 'Monte Carlo Tree Search'
+        }
+    })
+
+
+@app.route('/api/ai-vs-ai', methods=['POST'])
+def ai_vs_ai_move():
+    """
+    AI vs AI mod: Bir turda iki hamle yapar
+    - Minimax (adaptive depth) hamlesini yapar
+    - MCTS (configured iterations) hamlesini yapar
+    - Her iki hamlede de stats döndürür
+    """
+    if 'game' not in session:
+        session['game'] = create_game_session(PLAYER_AI)
+    
+    game = session['game']
+    board = game['board']
+    
+    if 'move_count' not in game:
+        game['move_count'] = 0
+    if 'current_depth' not in game:
+        game['current_depth'] = AI_DEPTH_DEFAULT
+    
+    # Oyun bitmiş mi?
+    if game['game_over']:
+        return jsonify({'error': 'Game is already over'}), 400
+    
+    # HAMLE 1: Minimax (Alpha-Beta)
+    minimax_start = time.time()
+    depth = game['current_depth']
+    round_count = game['move_count']
+    
+    if USE_BITBOARD_MINIMAX:
+        minimax_col, column_scores = get_best_move_bitboard(
+            board, 
+            PLAYER_AI, 
+            depth=depth,
+            developer_mode=True
+        )
+    else:
+        minimax_col, column_scores = get_best_move(
+            board, 
+            PLAYER_AI, 
+            depth=depth,
+            developer_mode=True
+        )
+    
+    minimax_time = time.time() - minimax_start
+    
+    # Minimax hamlesini uygula
+    if not is_valid_location(board, minimax_col):
+        return jsonify({'error': 'Invalid Minimax move'}), 500
+    
+    minimax_row = get_next_open_row(board, minimax_col)
+    drop_piece(board, minimax_row, minimax_col, PLAYER_AI)
+    game['move_count'] += 1
+    
+    # Kazandı mı?
+    if winning_move(board, PLAYER_AI):
+        game['game_over'] = True
+        game['winner'] = 'minimax'
+        session.modified = True
+        
+        return jsonify({
+            'game_over': True,
+            'winner': 'minimax',
+            'board': board_to_json(board),
+            'minimax_move': {
+                'row': minimax_row,
+                'col': minimax_col,
+                'thinking_time': round(minimax_time, 3),
+                'depth': depth,
+                'heuristic': column_scores.get(minimax_col, 0) if column_scores else 0,
+                'algorithm': 'Alpha-Beta Pruning'
+            },
+            'mcts_move': None
+        })
+    
+    # Tahta doldu mu?
+    if not get_valid_locations(board):
+        game['game_over'] = True
+        game['winner'] = 'draw'
+        session.modified = True
+        
+        return jsonify({
+            'game_over': True,
+            'winner': 'draw',
+            'board': board_to_json(board),
+            'minimax_move': {
+                'row': minimax_row,
+                'col': minimax_col,
+                'thinking_time': round(minimax_time, 3),
+                'depth': depth,
+                'heuristic': column_scores.get(minimax_col, 0) if column_scores else 0,
+                'algorithm': 'Alpha-Beta Pruning'
+            },
+            'mcts_move': None
+        })
+    
+    # HAMLE 2: MCTS
+    mcts_start = time.time()
+    
+    mcts_col, mcts_stats = get_best_move_mcts(
+        board,
+        PLAYER_HUMAN,  # MCTS plays as PLAYER_HUMAN
+        iterations=MCTS_ITERATIONS,
+        time_limit=5.0,
+        developer_mode=True
+    )
+    
+    mcts_time = time.time() - mcts_start
+    
+    # MCTS hamlesini uygula
+    if not is_valid_location(board, mcts_col):
+        return jsonify({'error': 'Invalid MCTS move'}), 500
+    
+    mcts_row = get_next_open_row(board, mcts_col)
+    drop_piece(board, mcts_row, mcts_col, PLAYER_HUMAN)
+    game['move_count'] += 1
+    
+    # Kazandı mı?
+    if winning_move(board, PLAYER_HUMAN):
+        game['game_over'] = True
+        game['winner'] = 'mcts'
+        session.modified = True
+        
+        return jsonify({
+            'game_over': True,
+            'winner': 'mcts',
+            'board': board_to_json(board),
+            'minimax_move': {
+                'row': minimax_row,
+                'col': minimax_col,
+                'thinking_time': round(minimax_time, 3),
+                'depth': depth,
+                'heuristic': column_scores.get(minimax_col, 0) if column_scores else 0,
+                'algorithm': 'Alpha-Beta Pruning'
+            },
+            'mcts_move': {
+                'row': mcts_row,
+                'col': mcts_col,
+                'thinking_time': round(mcts_time, 3),
+                'iterations': mcts_stats.get('iterations', MCTS_ITERATIONS),
+                'exploration_constant': mcts_stats.get('exploration_constant', 0.9),
+                'algorithm': 'Monte Carlo Tree Search'
+            }
+        })
+    
+    # Depth ayarlama (Minimax için)
+    new_depth, depth_change_msg = adjust_depth_by_runtime(
+        depth, minimax_time, round_count
+    )
+    game['current_depth'] = new_depth
+    
+    # Tahta tekrar doldu mu?
+    if not get_valid_locations(board):
+        game['game_over'] = True
+        game['winner'] = 'draw'
+    
+    session.modified = True
+    
+    return jsonify({
+        'game_over': game['game_over'],
+        'winner': game.get('winner'),
+        'board': board_to_json(board),
+        'minimax_move': {
+            'row': minimax_row,
+            'col': minimax_col,
+            'thinking_time': round(minimax_time, 3),
+            'depth': depth,
+            'new_depth': new_depth,
+            'heuristic': column_scores.get(minimax_col, 0) if column_scores else 0,
+            'algorithm': 'Alpha-Beta Pruning',
+            'depth_change_msg': depth_change_msg
+        },
+        'mcts_move': {
+            'row': mcts_row,
+            'col': mcts_col,
+            'thinking_time': round(mcts_time, 3),
+            'iterations': mcts_stats.get('iterations', MCTS_ITERATIONS),
+            'exploration_constant': mcts_stats.get('exploration_constant', 0.9),
+            'algorithm': 'Monte Carlo Tree Search'
+        }
+    })
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

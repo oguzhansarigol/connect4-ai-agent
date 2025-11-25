@@ -77,7 +77,6 @@ def main():
                 
                 # Görsel efekt: Yavaşça hamleyi göster
                 print("\n   ⏳ Hamle yapılıyor...")
-                time.sleep(1.5)  # 1.5 saniye bekleme - sunumda etkileyici!
             else:
                 col = get_best_move(board, PLAYER_AI, AI_DEPTH)
 

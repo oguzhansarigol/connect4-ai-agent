@@ -25,6 +25,7 @@ class Connect4Game {
         this.startHumanBtn = document.getElementById('start-human');
         this.startAiBtn = document.getElementById('start-ai');
         this.startRandomBtn = document.getElementById('start-random');
+        this.aiVsAiBtn = document.getElementById('ai-vs-ai-btn');
         this.moveCountElement = document.getElementById('move-count');
         this.devModeToggle = document.getElementById('dev-mode-toggle');
         this.devSettings = document.getElementById('dev-settings');
@@ -34,6 +35,12 @@ class Connect4Game {
         this.modalMessage = document.getElementById('modal-message');
         this.modalNewGameBtn = document.getElementById('modal-new-game');
         this.modalCloseBtn = document.getElementById('modal-close');
+        
+        // AI Battle Modal elements
+        this.battleModal = document.getElementById('ai-battle-modal');
+        this.closeBattleBtn = document.getElementById('close-battle-modal');
+        this.continueBattleBtn = document.getElementById('continue-battle');
+        this.isAiVsAiMode = false;
     }
     
     bindEvents() {
@@ -41,12 +48,17 @@ class Connect4Game {
         this.startHumanBtn.addEventListener('click', () => this.startNewGame('human'));
         this.startAiBtn.addEventListener('click', () => this.startNewGame('ai'));
         this.startRandomBtn.addEventListener('click', () => this.startNewGame('random'));
+        this.aiVsAiBtn.addEventListener('click', () => this.startAiVsAi());
         this.devModeToggle.addEventListener('change', (e) => this.toggleDevMode(e.target.checked));
         this.modalNewGameBtn.addEventListener('click', () => this.newGameFromModal());
         this.modalCloseBtn.addEventListener('click', () => this.hideModal());
         this.modal.addEventListener('click', (e) => {
             if (e.target === this.modal) this.hideModal();
         });
+        
+        // Battle modal events
+        this.closeBattleBtn.addEventListener('click', () => this.hideBattleModal());
+        this.continueBattleBtn.addEventListener('click', () => this.continueAiBattle());
     }
     
     updateDepthDisplay() {
@@ -243,6 +255,9 @@ class Connect4Game {
     async resetGame() {
         // Rastgele bir başlangıç oyuncusu seç
         await this.startNewGame('random');
+        // Depth'i varsayılan değere resetle
+        this.aiDepth = 6;
+        this.updateDepthDisplay();
     }
     
     async startNewGame(firstPlayer) {
@@ -259,6 +274,10 @@ class Connect4Game {
             this.moveCount = 0;
             this.updateGameState(data);
             this.hideModal();
+            
+            // I Start veya AI Start'a basıldığında da depth'i 6'ya resetle
+            this.aiDepth = 6;
+            this.updateDepthDisplay();
             
         } catch (error) {
             console.error('Yeni oyun başlatılırken hata:', error);
@@ -371,12 +390,22 @@ class Connect4Game {
     }
     
     showGameOverModal() {
-        if (this.winner === -1) {
+        // AI vs AI mode için string winner kontrolü
+        if (this.winner === 'minimax') {
+            this.modalTitle.textContent = '🧠 Minimax Won!';
+            this.modalMessage.textContent = 'Alpha-Beta Pruning dominated this match!';
+        } else if (this.winner === 'mcts') {
+            this.modalTitle.textContent = '🎲 MCTS Won!';
+            this.modalMessage.textContent = 'Monte Carlo Tree Search found the winning path!';
+        } else if (this.winner === -1) {
             this.modalTitle.textContent = '🎉 Congratulations!';
             this.modalMessage.textContent = 'Great game! You beat the AI!';
         } else if (this.winner === 1) {
             this.modalTitle.textContent = '🤖 AI Won';
             this.modalMessage.textContent = 'AI was better this time. Try again!';
+        } else if (this.winner === 'draw') {
+            this.modalTitle.textContent = '🤝 Draw';
+            this.modalMessage.textContent = 'Good fight! Both algorithms played well.';
         } else {
             this.modalTitle.textContent = '🤝 Draw';
             this.modalMessage.textContent = 'Good fight! You both played great.';
@@ -484,6 +513,141 @@ class Connect4Game {
         scorePanel.classList.add('visible');
         
         // Panel açık kalsın, kapanmasın
+    }
+    
+    // ========================================================================
+    // AI vs AI Mode Functions
+    // ========================================================================
+    
+    async startAiVsAi() {
+        // Reset game and enter AI vs AI mode
+        await this.resetGame();
+        this.isAiVsAiMode = true;
+        this.statusElement.textContent = '⚔️ AI vs AI Battle Mode';
+        
+        // Disable column buttons
+        const buttons = this.columnButtonsElement.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = true);
+        
+        // Make first AI vs AI move
+        setTimeout(() => this.makeAiVsAiMove(), 1000);
+    }
+    
+    async makeAiVsAiMove() {
+        if (this.gameOver || !this.isAiVsAiMode) return;
+        
+        try {
+            // Step 1: Minimax plays
+            this.statusElement.textContent = '🧠 Minimax is playing...';
+            
+            const minimaxResponse = await fetch('/api/ai-vs-ai-minimax', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const minimaxData = await minimaxResponse.json();
+            
+            if (!minimaxResponse.ok) {
+                console.error('Minimax move error:', minimaxData.error);
+                return;
+            }
+            
+            // Update board with Minimax move
+            this.board = minimaxData.board;
+            this.createBoard();
+            this.updateMoveCount();
+            
+            // Update depth if changed
+            if (minimaxData.move.new_depth) {
+                this.aiDepth = minimaxData.move.new_depth;
+                this.updateDepthDisplay();
+            }
+            
+            // Check if game ended after Minimax move
+            if (minimaxData.game_over) {
+                this.gameOver = true;
+                this.winner = minimaxData.winner;
+                this.isAiVsAiMode = false;
+                setTimeout(() => {
+                    this.showGameOverModal();
+                }, 1000);
+                return;
+            }
+            
+            // Wait before MCTS move
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // Step 2: MCTS plays
+            this.statusElement.textContent = '🎲 MCTS is playing...';
+            
+            const mctsResponse = await fetch('/api/ai-vs-ai-mcts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const mctsData = await mctsResponse.json();
+            
+            if (!mctsResponse.ok) {
+                console.error('MCTS move error:', mctsData.error);
+                return;
+            }
+            
+            // Update board with MCTS move
+            this.board = mctsData.board;
+            this.gameOver = mctsData.game_over;
+            this.winner = mctsData.winner;
+            this.createBoard();
+            this.updateMoveCount();
+            
+            // Wait before showing modal
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Step 3: Show battle modal with both stats
+            this.showBattleModal(minimaxData.move, mctsData.move);
+            
+            // Check if game over after both moves
+            if (this.gameOver) {
+                this.isAiVsAiMode = false;
+                setTimeout(() => {
+                    this.hideBattleModal();
+                    this.showGameOverModal();
+                }, 3000);
+            }
+            
+        } catch (error) {
+            console.error('AI vs AI move error:', error);
+            this.statusElement.textContent = 'Connection error!';
+            this.isAiVsAiMode = false;
+        }
+    }
+    
+    showBattleModal(minimaxMove, mctsMove) {
+        // Update Minimax stats
+        document.getElementById('minimax-move').textContent = `Column ${minimaxMove.col + 1}`;
+        document.getElementById('minimax-depth').textContent = minimaxMove.depth;
+        document.getElementById('minimax-heuristic').textContent = minimaxMove.heuristic.toFixed(2);
+        document.getElementById('minimax-time').textContent = `${minimaxMove.thinking_time.toFixed(2)}s`;
+        
+        // Update MCTS stats
+        document.getElementById('mcts-move').textContent = `Column ${mctsMove.col + 1}`;
+        document.getElementById('mcts-iterations').textContent = mctsMove.iterations.toLocaleString();
+        document.getElementById('mcts-exploration').textContent = mctsMove.exploration_constant.toFixed(2);
+        document.getElementById('mcts-time').textContent = `${mctsMove.thinking_time.toFixed(2)}s`;
+        
+        // Show modal
+        this.battleModal.classList.add('active');
+    }
+    
+    hideBattleModal() {
+        this.battleModal.classList.remove('active');
+    }
+    
+    continueAiBattle() {
+        this.hideBattleModal();
+        
+        if (!this.gameOver && this.isAiVsAiMode) {
+            setTimeout(() => this.makeAiVsAiMove(), 500);
+        }
     }
 }
 

@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-11-25T18:10:46.579320",
+  "total_games": 10,
+  "results": {
+    "matchup1": {
+      "config": "Alpha-Beta Pruning (Depth 6) vs Monte Carlo Tree Search (1000 iterations)",
+      "alpha_beta": {
+        "wins": 7,
+        "win_rate": 70.0,
+        "avg_time": 7.717546558380127
+      },
+      "mcts": {
+        "wins": 3,
+        "win_rate": 30.0,
+        "avg_time": 12.896382045745849
+      },
+      "draws": 0
+    },
+    "matchup2": {
+      "config": "Alpha-Beta Pruning (Depth 8) vs Monte Carlo Tree Search (2000 iterations)",
+      "alpha_beta": {
+        "wins": 10,
+        "win_rate": 100.0,
+        "avg_time": 73.94189593791961
+      },
+      "mcts": {
+        "wins": 0,
+        "win_rate": 0.0,
+        "avg_time": 33.47386288642883
+      },
+      "draws": 0
+    }
+  }
+}
