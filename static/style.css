@@ -474,8 +474,9 @@ input:checked + .slider:before {
     grid-template-columns: repeat(7, 1fr);
     gap: var(--cell-margin);
     margin-bottom: 10px;
-    width: calc(7 * (var(--cell-size) + var(--cell-margin)) - var(--cell-margin));
+    width: calc(7 * (var(--cell-size) + var(--cell-margin)) - var(--cell-margin) + 30px);
 }
+
 
 .column-btn {
     width: var(--cell-size);
@@ -1345,7 +1346,7 @@ input:checked + .slider:before {
 .ai-battle-panel {
     display: none;
     position: fixed;
-    right: 450px;
+    right: 100px; /* Control panel genişliği + boşluk kadar sağa */
     top: 100px;
     width: 380px;
     background: white;

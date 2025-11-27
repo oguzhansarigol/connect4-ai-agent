@@ -97,8 +97,8 @@ class Connect4Game {
         this.gameOver = data.game_over;
         this.winner = data.winner;
         
-        // Sync move count from backend
-        if (data.move_count !== undefined) {
+        // Sync move count from backend - SADECE AI vs AI modunda DEĞİL
+        if (data.move_count !== undefined && !this.isAiVsAiMode) {
             this.moveCount = data.move_count;
         }
         this.lastMove = data.last_move;  // Son hamleyi kaydet
@@ -110,8 +110,8 @@ class Connect4Game {
         
         if (this.gameOver) {
             this.showGameOverModal();
-        } else if (this.turn === 1) {
-            // AI'ın sırası geldiyse otomatik hamle yap
+        } else if (this.turn === 1 && !this.isAiVsAiMode) {
+            // AI'ın sırası geldiyse otomatik hamle yap (AI vs AI modunda değilse)
             setTimeout(() => this.makeAIMove(), 500);
         }
     }
@@ -635,7 +635,13 @@ class Connect4Game {
     
     async startAiVsAi() {
         // Reset game and enter AI vs AI mode
-        await this.resetGame();
+        // AI vs AI modunda her zaman Minimax (PLAYER_AI) başlar
+        await this.startNewGame('ai'); // AI (Minimax) başlasın
+        
+        // Move count'u sıfırla (startNewGame backend'den gelen değeri set eder)
+        this.moveCount = 0;
+        this.updateMoveCount();
+        
         this.isAiVsAiMode = true;
         this.statusElement.textContent = '⚔️ AI vs AI Battle Mode';
         
@@ -663,11 +669,13 @@ class Connect4Game {
             
             if (!minimaxResponse.ok) {
                 console.error('Minimax move error:', minimaxData.error);
+                this.isAiVsAiMode = false;
                 return;
             }
             
             // Update board with Minimax move
             this.board = minimaxData.board;
+            this.moveCount++; // Hamle sayısını artır
             this.createBoard();
             this.updateMoveCount();
             
@@ -703,6 +711,7 @@ class Connect4Game {
             
             if (!mctsResponse.ok) {
                 console.error('MCTS move error:', mctsData.error);
+                this.isAiVsAiMode = false;
                 return;
             }
             
@@ -710,6 +719,7 @@ class Connect4Game {
             this.board = mctsData.board;
             this.gameOver = mctsData.game_over;
             this.winner = mctsData.winner;
+            this.moveCount++; // Hamle sayısını artır
             this.createBoard();
             this.updateMoveCount();
             
