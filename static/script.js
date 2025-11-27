@@ -10,11 +10,13 @@ class Connect4Game {
         this.aiDepth = 6; // Default depth - SABIT (kullanıcı değiştiremiyor)
         this.devMode = false;
         this.lastMove = null; // Son oynanan hamle
+        this.bitboardEnabled = false; // Bitboard state - backend'den güncellenecek
         
         this.initializeElements();
         this.bindEvents();
         this.loadGameState();
         this.updateDepthDisplay(); // Depth'i UI'da göster
+        this.syncBitboardState(); // Bitboard state'i backend'den al
     }
     
     initializeElements() {
@@ -94,6 +96,11 @@ class Connect4Game {
         this.turn = data.turn;
         this.gameOver = data.game_over;
         this.winner = data.winner;
+        
+        // Sync move count from backend
+        if (data.move_count !== undefined) {
+            this.moveCount = data.move_count;
+        }
         this.lastMove = data.last_move;  // Son hamleyi kaydet
         
         this.createBoard();
@@ -270,10 +277,13 @@ class Connect4Game {
                 throw new Error(data.error || 'Hamle yapılırken hata oluştu');
             }
             
-            this.moveCount++;
-            
             // 2. Kullanıcı hamlesini HEMEN ekrana yansıt
             this.updateGameState(data);
+            
+            // Update Game Theory panel if in developer mode
+            if (this.devMode) {
+                this.updateGameTheoryPanel();
+            }
             
             // 3. Eğer AI'ın sırası geldiyse, kısa bir gecikme sonrası AI hamlesini tetikle
             if (data.turn === 1 && !data.game_over) {
@@ -328,6 +338,9 @@ class Connect4Game {
     async makeAIMove() {
         if (this.gameOver || this.turn !== 1) return;
         
+        // Store current turn BEFORE AI move for Game Theory display
+        this.turnBeforeAIMove = this.turn;
+        
         this.disableColumnButtons();
         this.updateStatus();
         
@@ -352,8 +365,6 @@ class Connect4Game {
                 throw new Error(data.error || 'AI hamle yapılırken hata oluştu');
             }
             
-            this.moveCount++;
-            
             // Backend'den depth bilgisi gelirse güncelle (dinamik depth yönetimi)
             if (data.ai_move && data.ai_move.depth !== undefined) {
                 const previousDepth = this.aiDepth;
@@ -370,7 +381,10 @@ class Connect4Game {
                 }
             }
             
-            // Developer mode ise skorları göster
+            // Update game state FIRST to get correct gameOver/winner status
+            this.updateGameState(data);
+            
+            // THEN show scores with updated state
             if (this.devMode && data.ai_move) {
                 const aiScores = data.ai_move.column_scores || null;
                 const aiTime = data.ai_move.thinking_time || null;
@@ -378,8 +392,6 @@ class Connect4Game {
                     this.showColumnScores(aiScores, data.ai_move.col, aiTime);
                 }
             }
-            
-            this.updateGameState(data);
             
         } catch (error) {
             console.error('AI hamle yapılırken hata:', error);
@@ -462,45 +474,69 @@ class Connect4Game {
         this.resetGame();
     }
     
+    updateGameTheoryPanel() {
+        // Update Game Theory panel with current game state
+        if (!this.devMode) return;
+        
+        let gameTheoryPanel = document.getElementById('game-theory-panel');
+        if (!gameTheoryPanel) return;
+        
+        // Calculate valid columns from current board
+        const validCols = [];
+        for (let col = 0; col < 7; col++) {
+            // Check if column is not full
+            if (this.board[5][col] === 0) {
+                validCols.push(col + 1);
+            }
+        }
+        const actionsStr = validCols.length > 0 ? validCols.join(', ') : 'None';
+        
+        // TO-MOVE: Show NEXT player (who will move)
+        // Backend: PLAYER_AI=1, PLAYER_HUMAN=-1
+        const nextPlayer = this.turn === 1 ? 'AI (Yellow)' : 'Human (Red)';
+        
+        // IS-TERMINAL: Current game state
+        let terminalStatus;
+        if (this.gameOver) {
+            if (this.winner === 1) {
+                terminalStatus = '✅ YES - AI Victory (+1000 utility)';
+            } else if (this.winner === -1) {
+                terminalStatus = '✅ YES - Human Victory (-1000 utility)';
+            } else {
+                terminalStatus = '✅ YES - Draw (0 utility)';
+            }
+        } else {
+            terminalStatus = '❌ NO - Game continues, next: ' + nextPlayer;
+        }
+        
+        let theoryHtml = '';
+        theoryHtml += '<div class="game-theory-header">📚 Game Theory Model</div>';
+        theoryHtml += '<div class="game-theory-content">';
+        theoryHtml += '<ul class="theory-list">';
+        theoryHtml += '<li><strong>S₀:</strong> Initial state (empty 6×7 board)</li>';
+        theoryHtml += `<li><strong>TO-MOVE(s):</strong> ${nextPlayer}</li>`;
+        theoryHtml += `<li><strong>ACTIONS(s):</strong> Valid columns: {${actionsStr}}</li>`;
+        theoryHtml += `<li><strong>RESULT(s,a):</strong> Drop disc in column a → New state s'</li>`;
+        theoryHtml += `<li><strong>IS-TERMINAL(s):</strong> ${terminalStatus}</li>`;
+        theoryHtml += '<li><strong>UTILITY(s,p):</strong> +1000 (AI win), -1000 (Human win), 0 (draw)</li>';
+        theoryHtml += '</ul>';
+        theoryHtml += '</div>';
+        
+        gameTheoryPanel.innerHTML = theoryHtml;
+        gameTheoryPanel.classList.add('visible');
+    }
+
     showColumnScores(columnScores, bestCol, thinkingTime = null) {
         // Sadece Developer Mode aktifse göster
         if (!this.devMode) {
             return;
         }
         
-        // ============================================================
-        // 1. GAME THEORY MODEL PANEL (Ayrı Panel - Tahtanın Altında)
-        // ============================================================
-        let gameTheoryPanel = document.getElementById('game-theory-panel');
-        if (gameTheoryPanel) {
-            // Dinamik değerler hesapla
-            const validCols = [];
-            for (let col = 0; col < 7; col++) {
-                if (columnScores[col] !== undefined && columnScores[col] !== null) {
-                    validCols.push(col + 1);
-                }
-            }
-            const actionsStr = validCols.length > 0 ? validCols.join(', ') : 'None';
-            
-            let theoryHtml = '';
-            theoryHtml += '<div class="game-theory-header">📚 Game Theory Model</div>';
-            theoryHtml += '<div class="game-theory-content">';
-            theoryHtml += '<ul class="theory-list">';
-            theoryHtml += '<li><strong>S₀:</strong> Initial state (empty 6×7 board)</li>';
-            theoryHtml += `<li><strong>TO-MOVE(s):</strong> AI (Yellow)</li>`;
-            theoryHtml += `<li><strong>ACTIONS(s):</strong> Valid columns: {${actionsStr}}</li>`;
-            theoryHtml += `<li><strong>RESULT(s,a):</strong> Drop disc in column a → New state s'</li>`;
-            theoryHtml += `<li><strong>IS-TERMINAL(s):</strong> Checked after move (win/draw detection)</li>`;
-            theoryHtml += '<li><strong>UTILITY(s,p):</strong> +1000 (AI win), -1000 (Human win), 0 (draw)</li>';
-            theoryHtml += '</ul>';
-            theoryHtml += '</div>';
-            
-            gameTheoryPanel.innerHTML = theoryHtml;
-            gameTheoryPanel.classList.add('visible');
-        }
+        // Update Game Theory Panel first
+        this.updateGameTheoryPanel();
         
         // ============================================================
-        // 2. AI DECISION PROCESS PANEL (Sağda - Skor + Optimizasyonlar)
+        // AI DECISION PROCESS PANEL (Sağda - Skor + Optimizasyonlar)
         // ============================================================
         let scorePanel = document.getElementById('ai-decision-panel');
         if (!scorePanel) {
@@ -519,10 +555,10 @@ class Connect4Game {
         html += '<div class="score-header">🔍 Decision Process</div>';
         html += '<div class="score-subtitle">Column Evaluations (Minimax Scores)</div>';
         
-        // AI düşünme süresini göster
-        if (thinkingTime !== null) {
-            html += `<div class="thinking-time">⏱️ Thinking Time: ${thinkingTime}s | Depth: ${this.aiDepth}</div>`;
-        }
+        // AI düşünme süresi ve bitboard status - HER ZAMAN GÖSTER
+        const bitboardStatus = this.bitboardEnabled ? '✅ BITBOARD' : '⚪ 2D Array';
+        const timeDisplay = thinkingTime !== null ? `⏱️ ${thinkingTime}s | ` : '';
+        html += `<div class="thinking-time">${timeDisplay}Depth: ${this.aiDepth} | ${bitboardStatus}</div>`;
         
         html += '<div class="scores-container">';
         
@@ -728,6 +764,31 @@ class Connect4Game {
         }
     }
     
+    async syncBitboardState() {
+        // Fetch current bitboard state from backend
+        try {
+            const response = await fetch('/api/toggle-bitboard', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ enabled: this.bitboardEnabled })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.bitboard_enabled !== undefined) {
+                this.bitboardEnabled = data.bitboard_enabled;
+                if (this.bitboardToggle) {
+                    this.bitboardToggle.checked = this.bitboardEnabled;
+                }
+                console.log(`Bitboard state synced: ${this.bitboardEnabled ? 'ENABLED' : 'DISABLED'}`);
+            }
+        } catch (error) {
+            console.error('Failed to sync bitboard state:', error);
+        }
+    }
+
     async toggleBitboard(enabled) {
         // Bitboard toggle - backend'e gönder
         try {
@@ -742,10 +803,18 @@ class Connect4Game {
             const data = await response.json();
             
             if (response.ok) {
-                console.log(`Bitboard Minimax: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+                // Update local state from backend response
+                this.bitboardEnabled = data.bitboard_enabled;
+                
+                // Sync checkbox with actual backend state
+                if (this.bitboardToggle) {
+                    this.bitboardToggle.checked = this.bitboardEnabled;
+                }
+                
+                console.log(`Bitboard Minimax: ${this.bitboardEnabled ? 'ENABLED' : 'DISABLED'}`);
                 this.showToast(
                     '⚡ Bitboard Minimax',
-                    enabled ? 'Bitboard optimization enabled!' : 'Using standard minimax'
+                    this.bitboardEnabled ? 'Bitboard optimization enabled!' : 'Using standard minimax'
                 );
             } else {
                 console.error('Bitboard toggle error:', data.error);

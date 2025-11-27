@@ -181,7 +181,8 @@ def make_move():
         'game_over': game['game_over'],
         'winner': game['winner'],
         'last_move': game['last_move'],
-        'valid_columns': get_valid_locations(game['board'])
+        'valid_columns': get_valid_locations(game['board']),
+        'move_count': game.get('move_count', 0)
     }
     
     return jsonify(response_data)
@@ -219,6 +220,11 @@ def make_ai_move():
     # AI hamlesini yap (developer mode ile veya olmadan)
     column_scores = None
     start_time = time.time()
+    
+    # Debug: Bitboard kullanımını logla
+    algo_name = "BITBOARD" if USE_BITBOARD_MINIMAX else "2D_ARRAY"
+    print(f"[AI Move] Using {algo_name} at depth {depth}")
+    
     if developer_mode:
         if USE_BITBOARD_MINIMAX:
             ai_col, column_scores = get_best_move_bitboard(board, PLAYER_AI, depth, developer_mode=True)
@@ -231,14 +237,18 @@ def make_ai_move():
             ai_col = get_best_move(board, PLAYER_AI, depth, developer_mode=False)
     thinking_time = time.time() - start_time
     
+    print(f"[AI Move] Completed in {thinking_time:.3f}s, chose column {ai_col}")
+    
     # ⚡ RUNTIME-BASED DYNAMIC DEPTH ADJUSTMENT (YENİ KURALLAR)
     new_depth, depth_change_msg = adjust_depth_by_runtime(depth, thinking_time, round_count, TARGET_THINKING_TIME)
-    game['current_depth'] = new_depth  # Yeni depth'i kaydet
     
     ai_row = get_next_open_row(board, ai_col)
     drop_piece(board, ai_row, ai_col, PLAYER_AI)
     game['last_move'] = {'player': PLAYER_AI, 'row': ai_row, 'col': ai_col}
     game['move_count'] = game.get('move_count', 0) + 1  # Hamle sayacını artır
+    
+    # Update depth AFTER move count increment to avoid double counting
+    game['current_depth'] = new_depth
     
     # Kazanma kontrolü
     if winning_move(board, PLAYER_AI):
@@ -260,6 +270,7 @@ def make_ai_move():
         'winner': game['winner'],
         'last_move': game['last_move'],
         'valid_columns': get_valid_locations(game['board']),
+        'move_count': game.get('move_count', 0),
         'ai_move': {
             'row': ai_row, 
             'col': ai_col,
@@ -302,7 +313,8 @@ def reset_game():
         'game_over': game['game_over'],
         'winner': game['winner'],
         'last_move': game['last_move'],
-        'valid_columns': get_valid_locations(game['board'])
+        'valid_columns': get_valid_locations(game['board']),
+        'move_count': game.get('move_count', 0)
     })
 
 
