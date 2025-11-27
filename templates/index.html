@@ -28,6 +28,14 @@
                         </label>
                         <span class="dev-label">Developer Mode</span>
                     </div>
+                    
+                    <!-- Bitboard Toggle (Sadece Developer Mode'da görünür) -->
+                    <div class="bitboard-toggle" id="bitboard-toggle-section" style="display: none;">
+                        <label class="bitboard-checkbox">
+                            <input type="checkbox" id="bitboard-toggle">
+                            <span class="bitboard-label">⚡ Use Bitboard Minimax</span>
+                        </label>
+                    </div>
                 </div>
                 
                 <!-- AI Depth Display (read-only) -->
@@ -129,77 +137,67 @@
             </div>
         </div>
         
-        <!-- AI vs AI Battle Modal -->
-        <div class="ai-battle-modal" id="ai-battle-modal">
-            <div class="ai-battle-content">
-                <button class="close-battle-btn" id="close-battle-modal">×</button>
-                
-                <div class="battle-header">
-                    <h2>⚔️ AI BATTLE ROUND</h2>
-                </div>
-                
-                <div class="battle-main">
-                    <!-- Minimax (Sol) -->
-                    <div class="algorithm-panel minimax-panel">
-                        <div class="algo-header">
-                            <h3>🧠 MINIMAX</h3>
-                            <p class="algo-subtitle">Alpha-Beta Pruning</p>
+        <!-- AI vs AI Battle Panel (Sağda, tahta görünür kalır) -->
+        <div class="ai-battle-panel" id="ai-battle-panel">
+            <div class="battle-panel-header">
+                <h3>⚔️ AI BATTLE</h3>
+            </div>
+            
+            <div class="battle-stats">
+                <!-- Minimax Stats -->
+                <div class="algorithm-stats minimax-stats">
+                    <div class="algo-title">🧠 MINIMAX</div>
+                    <div class="algo-subtitle">Alpha-Beta Pruning</div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Move:</span>
+                            <span class="stat-value" id="minimax-move">-</span>
                         </div>
-                        <div class="algo-stats">
-                            <div class="stat-row">
-                                <span class="stat-label">Move:</span>
-                                <span class="stat-value" id="minimax-move">-</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Depth:</span>
-                                <span class="stat-value" id="minimax-depth">-</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Heuristic:</span>
-                                <span class="stat-value" id="minimax-heuristic">-</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Time:</span>
-                                <span class="stat-value" id="minimax-time">-</span>
-                            </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Depth:</span>
+                            <span class="stat-value" id="minimax-depth">-</span>
                         </div>
-                    </div>
-                    
-                    <!-- VS Divider -->
-                    <div class="vs-divider">
-                        <span class="vs-text">VS</span>
-                    </div>
-                    
-                    <!-- MCTS (Sağ) -->
-                    <div class="algorithm-panel mcts-panel">
-                        <div class="algo-header">
-                            <h3>🎲 MCTS</h3>
-                            <p class="algo-subtitle">Monte Carlo Tree Search</p>
+                        <div class="stat-item">
+                            <span class="stat-label">Heuristic:</span>
+                            <span class="stat-value" id="minimax-heuristic">-</span>
                         </div>
-                        <div class="algo-stats">
-                            <div class="stat-row">
-                                <span class="stat-label">Move:</span>
-                                <span class="stat-value" id="mcts-move">-</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Iterations:</span>
-                                <span class="stat-value" id="mcts-iterations">-</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Exploration:</span>
-                                <span class="stat-value" id="mcts-exploration">-</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Time:</span>
-                                <span class="stat-value" id="mcts-time">-</span>
-                            </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Time:</span>
+                            <span class="stat-value" id="minimax-time">-</span>
                         </div>
                     </div>
                 </div>
                 
-                <div class="battle-footer">
-                    <button class="btn primary-btn" id="continue-battle">Next Round ▶</button>
+                <div class="vs-divider-small">VS</div>
+                
+                <!-- MCTS Stats -->
+                <div class="algorithm-stats mcts-stats">
+                    <div class="algo-title">🎲 MCTS</div>
+                    <div class="algo-subtitle">Monte Carlo</div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Move:</span>
+                            <span class="stat-value" id="mcts-move">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Iterations:</span>
+                            <span class="stat-value" id="mcts-iterations">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Exploration:</span>
+                            <span class="stat-value" id="mcts-exploration">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Time:</span>
+                            <span class="stat-value" id="mcts-time">-</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+            
+            <div class="battle-controls">
+                <button class="btn primary-btn" id="continue-battle">Next Round ▶</button>
+                <button class="btn secondary-btn" id="close-battle">Close Battle</button>
             </div>
         </div>
     </div>

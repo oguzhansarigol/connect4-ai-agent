@@ -37,11 +37,15 @@ class Connect4Game {
         this.modalNewGameBtn = document.getElementById('modal-new-game');
         this.modalCloseBtn = document.getElementById('modal-close');
         
-        // AI Battle Modal elements
-        this.battleModal = document.getElementById('ai-battle-modal');
-        this.closeBattleBtn = document.getElementById('close-battle-modal');
+        // AI Battle Panel elements (sağ tarafta sabit panel)
+        this.battlePanel = document.getElementById('ai-battle-panel');
+        this.closeBattleBtn = document.getElementById('close-battle');
         this.continueBattleBtn = document.getElementById('continue-battle');
         this.isAiVsAiMode = false;
+        
+        // Bitboard toggle elements
+        this.bitboardToggle = document.getElementById('bitboard-toggle');
+        this.bitboardToggleSection = document.getElementById('bitboard-toggle-section');
     }
     
     bindEvents() {
@@ -57,9 +61,14 @@ class Connect4Game {
             if (e.target === this.modal) this.hideModal();
         });
         
-        // Battle modal events
-        this.closeBattleBtn.addEventListener('click', () => this.hideBattleModal());
+        // Battle panel events
+        this.closeBattleBtn.addEventListener('click', () => this.hideBattlePanel());
         this.continueBattleBtn.addEventListener('click', () => this.continueAiBattle());
+        
+        // Bitboard toggle event
+        if (this.bitboardToggle) {
+            this.bitboardToggle.addEventListener('change', (e) => this.toggleBitboard(e.target.checked));
+        }
     }
     
     updateDepthDisplay() {
@@ -192,6 +201,15 @@ class Connect4Game {
                 this.depthSection.style.display = 'flex';
             } else {
                 this.depthSection.style.display = 'none';
+            }
+        }
+        
+        // Bitboard Toggle görünürlüğünü kontrol et
+        if (this.bitboardToggleSection) {
+            if (enabled) {
+                this.bitboardToggleSection.style.display = 'block';
+            } else {
+                this.bitboardToggleSection.style.display = 'none';
             }
         }
         
@@ -469,11 +487,11 @@ class Connect4Game {
             theoryHtml += '<div class="game-theory-content">';
             theoryHtml += '<ul class="theory-list">';
             theoryHtml += '<li><strong>S₀:</strong> Initial state (empty 6×7 board)</li>';
-            theoryHtml += `<li><strong>TO-MOVE(s):</strong> ${this.turn === 1 ? 'AI (Yellow)' : 'Human (Red)'}</li>`;
+            theoryHtml += `<li><strong>TO-MOVE(s):</strong> AI (Yellow)</li>`;
             theoryHtml += `<li><strong>ACTIONS(s):</strong> Valid columns: {${actionsStr}}</li>`;
-            theoryHtml += `<li><strong>RESULT(s,a):</strong> Drop disc in column a → New 6×7 state</li>`;
-            theoryHtml += `<li><strong>IS-TERMINAL(s):</strong> ${this.gameOver ? 'Yes (Game Over)' : 'No (Game continues)'}</li>`;
-            theoryHtml += '<li><strong>UTILITY(s,p):</strong> +1000 (win), -1000 (lose), 0 (draw)</li>';
+            theoryHtml += `<li><strong>RESULT(s,a):</strong> Drop disc in column a → New state s'</li>`;
+            theoryHtml += `<li><strong>IS-TERMINAL(s):</strong> Checked after move (win/draw detection)</li>`;
+            theoryHtml += '<li><strong>UTILITY(s,p):</strong> +1000 (AI win), -1000 (Human win), 0 (draw)</li>';
             theoryHtml += '</ul>';
             theoryHtml += '</div>';
             
@@ -659,17 +677,17 @@ class Connect4Game {
             this.createBoard();
             this.updateMoveCount();
             
-            // Wait before showing modal
+            // Wait before showing panel
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Step 3: Show battle modal with both stats
-            this.showBattleModal(minimaxData.move, mctsData.move);
+            // Step 3: Show battle panel with both stats
+            this.showBattlePanel(minimaxData.move, mctsData.move);
             
             // Check if game over after both moves
             if (this.gameOver) {
                 this.isAiVsAiMode = false;
                 setTimeout(() => {
-                    this.hideBattleModal();
+                    this.hideBattlePanel();
                     this.showGameOverModal();
                 }, 3000);
             }
@@ -681,7 +699,7 @@ class Connect4Game {
         }
     }
     
-    showBattleModal(minimaxMove, mctsMove) {
+    showBattlePanel(minimaxMove, mctsMove) {
         // Update Minimax stats
         document.getElementById('minimax-move').textContent = `Column ${minimaxMove.col + 1}`;
         document.getElementById('minimax-depth').textContent = minimaxMove.depth;
@@ -694,19 +712,50 @@ class Connect4Game {
         document.getElementById('mcts-exploration').textContent = mctsMove.exploration_constant.toFixed(2);
         document.getElementById('mcts-time').textContent = `${mctsMove.thinking_time.toFixed(2)}s`;
         
-        // Show modal
-        this.battleModal.classList.add('active');
+        // Show panel
+        this.battlePanel.classList.add('active');
     }
     
-    hideBattleModal() {
-        this.battleModal.classList.remove('active');
+    hideBattlePanel() {
+        this.battlePanel.classList.remove('active');
     }
     
     continueAiBattle() {
-        this.hideBattleModal();
+        this.hideBattlePanel();
         
         if (!this.gameOver && this.isAiVsAiMode) {
             setTimeout(() => this.makeAiVsAiMove(), 500);
+        }
+    }
+    
+    async toggleBitboard(enabled) {
+        // Bitboard toggle - backend'e gönder
+        try {
+            const response = await fetch('/api/toggle-bitboard', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ enabled: enabled })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                console.log(`Bitboard Minimax: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+                this.showToast(
+                    '⚡ Bitboard Minimax',
+                    enabled ? 'Bitboard optimization enabled!' : 'Using standard minimax'
+                );
+            } else {
+                console.error('Bitboard toggle error:', data.error);
+                // Hata olursa checkbox'u geri al
+                this.bitboardToggle.checked = !enabled;
+            }
+        } catch (error) {
+            console.error('Bitboard toggle request failed:', error);
+            // Hata olursa checkbox'u geri al
+            this.bitboardToggle.checked = !enabled;
         }
     }
 }

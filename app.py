@@ -680,5 +680,22 @@ def ai_vs_ai_move():
     })
 
 
+@app.route('/api/toggle-bitboard', methods=['POST'])
+def toggle_bitboard():
+
+    global USE_BITBOARD_MINIMAX
+    
+    data = request.get_json()
+    enabled = data.get('enabled', False)
+    
+    USE_BITBOARD_MINIMAX = enabled
+    
+    return jsonify({
+        'success': True,
+        'bitboard_enabled': USE_BITBOARD_MINIMAX,
+        'message': f'Bitboard Minimax {"enabled" if enabled else "disabled"}'
+    })
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
