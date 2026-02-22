@@ -10,6 +10,8 @@ An intelligent Connect4 game featuring a competitive AI agent powered by minimax
 
 ---
 
+
+[Project Paper](https://github.com/oguzhansarigol/connect4-ai-agent/blob/main/AI%20Agent%20Project-%20Computational%20Analysis%20of%20Alpha-Beta%20Pruning.pdf)
 ## ✨ Features
 
 ### 🧠 Intelligent AI Agent
